@@ -1,0 +1,29 @@
+---
+title: "eda"
+author: "Kate Colvin"
+date: "2024-12-11"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(gtsummary)
+
+```
+
+## Data Cleaning 
+
+```{r}
+
+score_df <- read_csv("Project_1_data.csv") %>% 
+  janitor::clean_names()
+
+score_df %>% 
+  tbl_summary(by = gender) %>% 
+  add_overall()
+
+```
+
