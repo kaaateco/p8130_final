@@ -11,19 +11,87 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(gtsummary)
+library(corrplot)
 
 ```
 
 ## Data Cleaning 
 
+Reading in data, creating summary table
+
 ```{r}
 
 score_df <- read_csv("Project_1_data.csv") %>% 
-  janitor::clean_names()
+  janitor::clean_names() %>% 
+  mutate(wkly_study_hours = 
+           case_match(
+             wkly_study_hours, 
+             "< 5" ~ "< 5",
+             "> 10" ~ "> 10", 
+             "10-May" ~ "5-10"), 
+         wkly_study_hours = factor(wkly_study_hours, c("< 5", "5-10", "> 10")))
+  
 
-score_df %>% 
-  tbl_summary(by = gender) %>% 
-  add_overall()
+table1 <- score_df %>% 
+  tbl_summary()
+table1
+
+```
+
+
+## Visualizations 
+
+Plotting the overall distribution of scores, stratified by subject
+
+```{r}
+
+score_long_df <- score_df %>%  
+  pivot_longer(cols = math_score:writing_score, 
+               names_to = "subject", 
+               values_to = "score")
+
+score_dists_plot <- score_long_df %>% 
+  ggplot(aes(x = score, fill = subject, color = subject)) +
+  geom_density(alpha = 0.3, linewidth = 1) +
+  labs(x = "Test Score", y = "Density") +
+  theme_minimal()
+score_dists_plot
+
+# Test for differences 
+
+score_test <- score_long_df %>% select(subject, score) %>% 
+  tbl_summary(by = subject) %>% 
+  add_overall() %>% 
+  add_p()
+score_test
+
+```
+
+Correlation between test scores 
+
+```{r}
+
+cor_matrix <- score_df %>% 
+  select(math_score, reading_score, writing_score) %>% 
+  cor()
+
+corrplot(cor_matrix,  method = "color", 
+         addCoef.col = "black", 
+         tl.col = "black",      
+         tl.srt = 45,
+         order = 'hclust',
+         diag = F)
+
+```
+
+
+```{r}
+
+score_long_df %>% na.omit(wkly_study_hours) %>% 
+  ggplot(aes(x = wkly_study_hours, y = score, fill = subject)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(x = "Weekly Study Hours", y = "Test Score") +
+  theme_minimal()
 
 ```
 

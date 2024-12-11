@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  11 DEC 2024 00:36
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.7)  11 DEC 2024 16:44
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -585,53 +585,83 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 File: mt-msb.cfg 2005/06/01 v1.0 microtype config. file: AMS symbols (b) (RS)
 )
 LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 1
-26.
+28.
 (/usr/local/texlive/2024/texmf-dist/tex/latex/lm/t1lmtt.fd
 File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 127.
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 129.
 LaTeX Font Info:    Trying to load font information for TS1+lmtt on input line 
-141.
+150.
 (/usr/local/texlive/2024/texmf-dist/tex/latex/lm/ts1lmtt.fd
 File: ts1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-Underfull \hbox (badness 10000) in paragraph at lines 217--218
+Underfull \hbox (badness 10000) in paragraph at lines 229--230
 
  []
 
 
-LaTeX Warning: Float too large for page by 220.41017pt on input line 219.
+LaTeX Warning: Float too large for page by 263.6101pt on input line 231.
 
+<eda_files/figure-latex/unnamed-chunk-2-1.pdf, id=4, 453.695pt x 313.17pt>
+File: eda_files/figure-latex/unnamed-chunk-2-1.pdf Graphic file (type pdf)
+<use eda_files/figure-latex/unnamed-chunk-2-1.pdf>
+Package pdftex.def Info: eda_files/figure-latex/unnamed-chunk-2-1.pdf  used on 
+input line 253.
+(pdftex.def)             Requested size: 453.6939pt x 313.16922pt.
 [1
 
 {/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/loc
 al/texlive/2024/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/usr/local/texlive/202
-4/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}] [2] (./eda.aux)
+4/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
+Overfull \hbox (228.73146pt too wide) in alignment at lines 269--275
+[] [] [] [] [] [] 
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 277--279
+
+ []
+
+<eda_files/figure-latex/unnamed-chunk-3-1.pdf, id=19, 367.3725pt x 321.2pt>
+File: eda_files/figure-latex/unnamed-chunk-3-1.pdf Graphic file (type pdf)
+<use eda_files/figure-latex/unnamed-chunk-3-1.pdf>
+Package pdftex.def Info: eda_files/figure-latex/unnamed-chunk-3-1.pdf  used on 
+input line 299.
+(pdftex.def)             Requested size: 367.38278pt x 321.20901pt.
+[2 <./eda_files/figure-latex/unnamed-chunk-2-1.pdf>]
+<eda_files/figure-latex/unnamed-chunk-4-1.pdf, id=35, 453.695pt x 315.1775pt>
+File: eda_files/figure-latex/unnamed-chunk-4-1.pdf Graphic file (type pdf)
+<use eda_files/figure-latex/unnamed-chunk-4-1.pdf>
+Package pdftex.def Info: eda_files/figure-latex/unnamed-chunk-4-1.pdf  used on 
+input line 311.
+(pdftex.def)             Requested size: 453.6939pt x 315.17673pt.
+[3 <./eda_files/figure-latex/unnamed-chunk-3-1.pdf>] [4 <./eda_files/figure-lat
+ex/unnamed-chunk-4-1.pdf>] [5] [6] (./eda.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 15482 strings out of 474116
- 247929 string characters out of 5743682
- 1955187 words of memory out of 5000000
- 37572 multiletter control sequences out of 15000+600000
- 592956 words of font info for 80 fonts, out of 8000000 for 9000
+ 15515 strings out of 474116
+ 249206 string characters out of 5743682
+ 1950187 words of memory out of 5000000
+ 37598 multiletter control sequences out of 15000+600000
+ 593275 words of font info for 81 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 83i,13n,93p,1000b,447s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 83i,13n,93p,1000b,469s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/lo
 cal/texlive/2024/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive
 /2024/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2024/texmf
 -dist/fonts/type1/public/lm/lmr17.pfb></usr/local/texlive/2024/texmf-dist/fonts
 /type1/public/lm/lmri8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/publ
 ic/lm/lmtk10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/lm/lmtt
-10.pfb>
-Output written on eda.pdf (2 pages, 160197 bytes).
+10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/lm/lmtti10.pfb>
+Output written on eda.pdf (6 pages, 225182 bytes).
 PDF statistics:
- 63 PDF objects out of 1000 (max. 8388607)
- 43 compressed objects within 1 object stream
- 5 named destinations out of 1000 (max. 500000)
- 18441 words of extra memory for PDF output out of 20736 (max. 10000000)
+ 123 PDF objects out of 1000 (max. 8388607)
+ 88 compressed objects within 1 object stream
+ 11 named destinations out of 1000 (max. 500000)
+ 18464 words of extra memory for PDF output out of 20736 (max. 10000000)
 
