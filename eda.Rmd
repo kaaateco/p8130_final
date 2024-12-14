@@ -2,7 +2,7 @@
 title: "eda"
 author: "Kate Colvin"
 date: "2024-12-11"
-output: pdf_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -12,12 +12,36 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(gtsummary)
 library(corrplot)
+library(flextable)
+library(gt)
 
 ```
 
+
+## Function to format word docs 
+
+Never mind I'm not using this anymore
+
+```{r}
+
+# FitFlextableToPage <- function(ft, pgwidth = 7.5){
+#   ft_out <- ft %>% autofit()
+# 
+#   ft_out <- width(ft_out, width = dim(ft_out)$widths*pgwidth /(flextable_dim(ft_out)$widths))
+#   return(ft_out)
+# }
+
+# table1 %>% 
+#   as_flex_table() %>% 
+#   FitFlextableToPage() %>% 
+#   flextable::save_as_docx(path = "summarytable.docx")
+
+```
+
+
 ## Data Cleaning 
 
-Reading in data, creating summary table
+Reading in + cleaning data
 
 ```{r}
 
@@ -31,10 +55,60 @@ score_df <- read_csv("Project_1_data.csv") %>%
              "10-May" ~ "5-10"), 
          wkly_study_hours = factor(wkly_study_hours, c("< 5", "5-10", "> 10")))
   
+```
+
+Summary Table 1 (Demographics)
+
+```{r}
 
 table1 <- score_df %>% 
-  tbl_summary()
+  select(-c(test_prep, wkly_study_hours, 
+         math_score, reading_score, writing_score)) %>% 
+  tbl_summary(
+    by = gender,
+    label = list("ethnic_group" ~ "Ethnic Group", 
+                 "parent_educ" ~ "Parents' Education",
+                 "lunch_type" ~ "Lunch Type", 
+                 "parent_marital_status" ~ "Parents' Marital Status", 
+                 "practice_sport" ~ "Practice Sport", 
+                 "is_first_child" ~ "Oldest Child (Yes/No)", 
+                 "nr_siblings" ~ "# Siblings", 
+                 "transport_means" ~ "Transport Means"), 
+    type = list(nr_siblings ~ "continuous"), 
+    digits = list(all_continuous() ~ c(0))) %>% 
+  bold_labels() %>% 
+  modify_caption("Table 1. Summary of Student Demographic Variables (N=948)") %>% 
+  add_overall() 
 table1
+
+table1 %>%
+  as_gt() %>%
+  gtsave(filename = "table1.png")
+
+```
+
+Summary Table 2 (Academics)
+
+```{r}
+
+table2 <- score_df %>% 
+  select(test_prep, wkly_study_hours, 
+         math_score, reading_score, writing_score, gender) %>% 
+  tbl_summary(
+    by = gender,
+    label = list("test_prep" ~ "Test Prep", 
+                 "wkly_study_hours" ~ "Weekly Study Hours",
+                 "math_score" ~ "Math Score", 
+                 "reading_score" ~ "Reading Score", 
+                 "writing_score" ~ "Writing Score")) %>% 
+  bold_labels() %>% 
+  modify_caption("Table 2. Summary of Student Academic Variables (N=948)") %>% 
+  add_overall() 
+table2
+
+table2 %>%
+  as_gt() %>%
+  gtsave(filename = "table2.png")
 
 ```
 
@@ -53,9 +127,10 @@ score_long_df <- score_df %>%
 score_dists_plot <- score_long_df %>% 
   ggplot(aes(x = score, fill = subject, color = subject)) +
   geom_density(alpha = 0.3, linewidth = 1) +
-  labs(x = "Test Score", y = "Density") +
-  theme_minimal()
+  labs(x = "Test Score", y = "Density")
 score_dists_plot
+
+ggsave("score_density.png")
 
 # Test for differences 
 
@@ -87,11 +162,13 @@ corrplot(cor_matrix,  method = "color",
 
 ```{r}
 
-score_long_df %>% na.omit(wkly_study_hours) %>% 
+boxplots_study <- score_long_df %>% na.omit(wkly_study_hours) %>% 
   ggplot(aes(x = wkly_study_hours, y = score, fill = subject)) +
   geom_boxplot(alpha = 0.8) +
-  labs(x = "Weekly Study Hours", y = "Test Score") +
-  theme_minimal()
+  labs(x = "Weekly Study Hours", y = "Test Score")
+boxplots_study
+
+ggsave("study_boxplots.png")
 
 ```
 
