@@ -18,9 +18,9 @@ library(gt)
 ```
 
 
-## Function to format word docs 
+## Function to format the tables into word doc 
 
-Never mind I'm not using this anymore
+Never mind I'm not using this anymore (the tables are huge and ugly and hard to format!!)
 
 ```{r}
 
@@ -169,6 +169,21 @@ boxplots_study <- score_long_df %>% na.omit(wkly_study_hours) %>%
 boxplots_study
 
 ggsave("study_boxplots.png")
+
+# Testing for differences in score distribution by study hour groups 
+
+score_df %>% 
+  select(test_prep, wkly_study_hours, 
+         math_score, reading_score, writing_score) %>% 
+  tbl_summary(
+    by = wkly_study_hours,
+    label = list("test_prep" ~ "Test Prep",
+                 "math_score" ~ "Math Score", 
+                 "reading_score" ~ "Reading Score", 
+                 "writing_score" ~ "Writing Score")) %>% 
+  bold_labels() %>% 
+  add_overall() %>% 
+  add_p()
 
 ```
 
