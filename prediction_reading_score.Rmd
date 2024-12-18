@@ -1,0 +1,286 @@
+---
+title: "writing_score_prediction"
+author: "Jeong Yun Choi"
+date: "2024-12-15"
+output: github_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = TRUE)
+library(PerformanceAnalytics)
+library(rstatix)
+library(gtools)
+library(tidyverse)
+library(ggplot2)
+library(caret)
+library(ggpubr)
+library(dplyr)
+
+knitr::opts_chunk$set(
+	include = TRUE,
+	warning = FALSE,
+	fig.width = 7, 
+  fig.height = 5,
+  out.width = "90%", 
+	fig.align = "center"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+
+theme_set(theme_minimal())
+```
+
+```{r, include=FALSE}
+score_df <- read_csv("Project_1_data.csv") |>  
+  janitor::clean_names() |>  
+  mutate(wkly_study_hours = 
+           case_match(
+             wkly_study_hours, 
+             "< 5" ~ "< 5",
+             "> 10" ~ "> 10", 
+             "10-May" ~ "5-10"), 
+         wkly_study_hours = factor(wkly_study_hours, c("< 5", "5-10", "> 10")), 
+         lunch_type = fct_relevel(lunch_type, "standard"), 
+         parent_marital_status = fct_relevel(parent_marital_status, "single"), 
+         transport_means = fct_relevel(transport_means, "school_bus"), 
+         parent_educ = fct_relevel(parent_educ, "some high school"))
+
+# Remove rows with NA values in relevant columns
+filtered_df <- score_df |> drop_na()
+```
+
+We implement step-wise regression to deduce significant covariates for modeling `writing score`. We note that most of the variables listed are categorical. Therefore, we incorporated factor releveing in order to give some dimensions. First, we will check for non-linearity in the scores and apply transformation if need be. 
+
+We also initially check which variables are significant for reading score.
+```{r}
+reading_modelv1 <- lm(reading_score ~ gender + wkly_study_hours + test_prep + nr_siblings, data = filtered_df)
+summary(reading_modelv1) 
+
+### number of siblings and wkly_study_hours> 10 not important
+```
+
+```{r Preliminary Model for Reading Score}
+# Box-Cox Transformation for Reading Score
+reading_modelv2 <- lm(reading_score ~ gender + test_prep + parent_educ + lunch_type, data = filtered_df)
+
+par(mfrow = c(2,2))
+plot(reading_modelv2)
+shapiro.test(rstandard(reading_modelv2))
+
+par(mfrow = c(1,1))
+boxcox_reading <- MASS::boxcox(reading_modelv2, lambda = seq(-2.5, 2.5, 0.1))
+
+boxcox_reading <- Reduce(cbind, boxcox_reading)
+optimal_power <- boxcox_reading |> 
+  as_tibble() |> 
+  filter(V2 == max(V2)) |> 
+  pull(init) |> 
+  round(digits =2)
+
+```
+
+Transformed Y using the optimal lambda: 
+```{r Preliminary Model 1 for Reading Score}
+score_df <- filtered_df |> 
+  mutate(transformed_reading = (reading_score +1)^1.44)
+
+reading_model1 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group + lunch_type + parent_educ, data = score_df)
+
+reading_model1 |> 
+  broom::tidy() |> 
+  mutate(`p.value` = signif(`p.value`, 3), 
+         estimate = round(estimate, 3), 
+         `std.error` = round(`std.error`, 3), 
+         statistic = round(statistic, 3)) |> 
+  knitr::kable(digits = 50)
+
+
+par(mfrow = c(2,2))
+plot(reading_model1)
+shapiro.test(rstandard(reading_model1))
+
+### removing the influential point if needed
+cooksd_read <- cooks.distance(reading_model1)
+influential_read <- as.numeric(names(cooksd_read)[(cooksd_read > 0.5)])
+# influential_read is 0
+```
+
+As seen above the after Y transformation where $Y^*= ({reading\_score + 1})^{1.44}$, the residuals follow normality, homoscedascity and mean zero looking at the diagnostic plots. 
+
+## effect of interaction of covariates
+```{r}
+### do gender and wkly study hour/test_prep/ethnic_group have combined effect?
+reading_model2v1 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group + lunch_type + gender*wkly_study_hours + gender*test_prep + gender*ethnic_group + gender*lunch_type, data = score_df)
+summary(reading_model2v1)
+
+### no significant interaction effect and adjusted R^2 decreasing so, not choosing these interactions
+
+### how about 4 way interaction of test prep with weekly study hours and ethnic_group
+reading_model2v2 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group + lunch_type + wkly_study_hours*test_prep*ethnic_group*lunch_type*parent_educ, data = score_df)
+summary(reading_model2v2)
+
+### no significant interaction effect and adjusted R^2 only slightly improved so, not choosing these interactions
+
+## how about adding 1 more covariate parent_educ and taking out 
+reading_model2v3 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group+ lunch_type + parent_educ , data = score_df)
+summary(reading_model2v3)
+
+## significant interaction effect for gender, test_prep, lunch_type, parent_educ, will
+```
+```{r}
+reading_model2 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group + lunch_type + parent_educ + , data = score_df)
+
+reading_model2 |> 
+  broom::tidy() |> 
+  mutate(`p.value` = signif(`p.value`, 3), 
+         estimate = round(estimate, 3), 
+         `std.error` = round(`std.error`, 3), 
+         statistic = round(statistic, 3)) |> 
+  knitr::kable(digits = 50)
+
+
+par(mfrow = c(2,2))
+plot(reading_model2)
+shapiro.test(rstandard(reading_model2))
+
+### removing the influential point if needed
+cooksd_read <- cooks.distance(reading_model2)
+influential_read <- as.numeric(names(cooksd_read)[(cooksd_read > 0.5)])
+# influential_read is 0
+```
+
+```{r}
+reading_model3 <- lm(transformed_reading ~ gender + parent_marital_status+ wkly_study_hours*parent_marital_status+ test_prep + parent_educ + ethnic_group + lunch_type + practice_sport, data = score_df)
+
+reading_model3 |> 
+  broom::tidy() |> 
+  mutate(`p.value` = signif(`p.value`, 3), 
+         estimate = round(estimate, 3), 
+         `std.error` = round(`std.error`, 3), 
+         statistic = round(statistic, 3)) |> 
+  knitr::kable(digits = 50)
+
+par(mfrow = c(2,2))
+plot(reading_model3)
+
+### removing the influential point if needed
+cooksd <- cooks.distance(reading_model3)
+influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+## no infleuntial points
+```
+
+```{r}
+### adding transport means
+reading_model4v1 <- lm(reading_score ~ gender + wkly_study_hours*parent_marital_status + test_prep + ethnic_group + lunch_type + transport_means, data = score_df)
+summary(reading_model4v1)
+
+### transportation was not important so going back
+
+### adding is_first_child
+math_model4v2 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status + test_prep + ethnic_group + lunch_type + parent_educ*parent_marital_status + is_first_child, data = score_df)
+summary(math_model4v2)
+
+### first child was not important so going back
+### will test math_model1, math_model2 and math_model3
+```
+## Splitting dataset for cross validation
+```{r, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
+#specify the cross-validation method
+set.seed(1)
+ctrl <- trainControl(method = "cv", number = 5)
+
+filtered_df <- score_df |> 
+  drop_na(gender, wkly_study_hours, parent_marital_status, test_prep, ethnic_group, 
+          lunch_type, parent_educ, practice_sport)
+
+#fit a regression model and use k-fold CV to evaluate performance
+model1 <- train(transformed_reading ~ gender + wkly_study_hours + 
+    test_prep + ethnic_group + lunch_type, data = filtered_df, method = "lm", trControl = ctrl)
+
+model2 <- train(transformed_reading ~ gender + wkly_study_hours + 
+    test_prep + ethnic_group + lunch_type + parent_educ, data = filtered_df, method = "lm", trControl = ctrl)
+
+model3 <- train(transformed_reading ~ gender + wkly_study_hours*parent_marital_status + test_prep + ethnic_group + lunch_type + 
+    parent_educ*parent_marital_status + practice_sport, data = filtered_df, method = "lm", trControl = ctrl)
+# get fold subsets
+fold_data_model1 <- lapply(model1$control$index, function(index) filtered_df[index,]) |> 
+    bind_rows(.id = "Fold") 
+fold_data_model2 <- lapply(model2$control$index, function(index) filtered_df[index,]) |> 
+    bind_rows(.id = "Fold") 
+fold_data_model3 <- lapply(model3$control$index, function(index) filtered_df[index,]) |> 
+    bind_rows(.id = "Fold") 
+
+# example plots
+plot1 <- ggplot(fold_data_model1, aes(math_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model1")
+plot2 <- ggplot(fold_data_model2, aes(math_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model2")
+plot3 <- ggplot(fold_data_model3, aes(math_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model3")
+ggarrange(plot1, plot2, plot3, ncol = 3, common.legend = TRUE)
+```
+
+Below is the 5-fold cross-validation results including fitted value versus observed score plot and performace metrices from each of the three models. 
+```{r, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
+filtered_df |> 
+  mutate(math_model1_pred = (model1[["finalModel"]][["fitted.values"]])^(1/1.29) - 1, 
+         math_model2_pred = (model2[["finalModel"]][["fitted.values"]])^(1/1.29) - 1, 
+         math_model3_pred = (model3[["finalModel"]][["fitted.values"]])^(1/1.29) - 1) |> 
+  pivot_longer(
+    cols = c(math_model1_pred, math_model2_pred, math_model3_pred), 
+    names_to = "model_type", 
+    values_to = "res"
+  ) |> 
+  ggplot(aes(x = res, y = math_score)) +
+  geom_abline(intercept = 0, slope = 1, color = "#f7aa58") +
+  geom_point(size = 1, shape = 21) +
+  facet_wrap(~model_type, scale = "free") +
+  stat_cor(label.y = 5) +
+  scale_x_discrete(labels = c("Predicted Math Score"))
+
+bind_rows(model1$results, model2$results, model3$results) |> 
+  mutate(model_id = c(1, 2, 3)) |> 
+  relocate(model_id) |> 
+  knitr::kable(digits =3, caption = "Performance matrices of the 3 Multiple Linear Regression Models")
+
+```
+
+
+```{r}
+score_df <- score_df |> 
+  mutate(transformed_writing = (writing_score +1)^1.29)
+writing_model1 <- lm(transformed_writing ~ gender + wkly_study_hours + test_prep + ethnic_group + lunch_type, data = score_df) 
+
+writing_model1 |> 
+  broom::tidy() |> 
+  mutate(`p.value` = signif(`p.value`, 3), 
+         estimate = round(estimate, 3), 
+         `std.error` = round(`std.error`, 3), 
+         statistic = round(statistic, 3)) |> 
+  knitr::kable(digits = 50)
+
+par(mfrow = c(2,2))
+plot(writing_model1)
+shapiro.test(rstandard(writing_model1))
+```
+
+## step_wise regression
+```{r preliminary data selection}
+library(leaps)
+
+subset_selection = regsubsets(life_exp ~ ., data = census_data, nbest = 1, method = 'exhaustive')
+result = summary(subset_selection)
+
+print(result)
+
+#
+```
+
+## Writing Model
+Again, first we analyze the box0cox transformation 
+```{r}
+# Box-Cox Transformation for Writing Score
+writing_model <- lm(writing_score ~ gender + wkly_study_hours + test_prep + parent_educ + lunch_type, data = filtered_df)
+
+boxcox_writing <- MASS::boxcox(writing_model, lambda = seq(-2.5, 2.5, 0.1))
+plot(writing_model)
+```
+
+
