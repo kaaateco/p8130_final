@@ -105,10 +105,11 @@ score_long_df <- score_df %>%
 score_dists_plot <- score_long_df %>% 
   ggplot(aes(x = score, fill = subject, color = subject)) +
   geom_density(alpha = 0.3, linewidth = 1) +
-  labs(x = "Test Score", y = "Density")
+  labs(x = "Test Score", y = "Density", 
+       title = "Figure 1: Distributions of Test Score by Subject")
 score_dists_plot
 
-# ggsave("score_density.png")
+ggsave("score_density.png", width = 7, height = 5)
 
 # Test for differences 
 
@@ -143,10 +144,11 @@ corrplot(cor_matrix,  method = "color",
 boxplots_study <- score_long_df %>% na.omit(wkly_study_hours) %>% 
   ggplot(aes(x = wkly_study_hours, y = score, fill = subject)) +
   geom_boxplot(alpha = 0.8) +
-  labs(x = "Weekly Study Hours", y = "Test Score")
+  labs(x = "Weekly Study Hours", y = "Test Score", 
+       title = "Figure 2: Distributions of Test Scores by Subject and Weekly Study Hours")
 boxplots_study
 
-# ggsave("study_boxplots.png")
+ggsave("study_boxplots.png",  width = 7, height = 5)
 
 # Testing for differences in score distribution by study hour groups 
 
@@ -161,6 +163,7 @@ score_df %>%
                  "writing_score" ~ "Writing Score")) %>% 
   bold_labels() %>% 
   add_overall() %>% 
+  modify_caption("Table 3. Academic Variables by Time Spent Studying (N=911)") %>% 
   add_p()
 
 ```
