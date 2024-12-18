@@ -125,10 +125,10 @@ summary(reading_model2v2)
 reading_model2v3 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group+ lunch_type + parent_educ , data = score_df)
 summary(reading_model2v3)
 
-## significant interaction effect for gender, test_prep, lunch_type, parent_educ, will
+## significant interaction effect for gender, test_prep, lunch_type, parent_educ
 ```
 ```{r}
-reading_model2 <- lm(transformed_reading ~ gender + wkly_study_hours + test_prep + ethnic_group + lunch_type + parent_educ + , data = score_df)
+reading_model2 <- lm(transformed_reading ~ gender + test_prep + ethnic_group + lunch_type , data = score_df)
 
 reading_model2 |> 
   broom::tidy() |> 
@@ -149,8 +149,31 @@ influential_read <- as.numeric(names(cooksd_read)[(cooksd_read > 0.5)])
 # influential_read is 0
 ```
 
+
 ```{r}
-reading_model3 <- lm(transformed_reading ~ gender + parent_marital_status+ wkly_study_hours*parent_marital_status+ test_prep + parent_educ + ethnic_group + lunch_type + practice_sport, data = score_df)
+### do gender and wkly study hour/test_prep/ethnic_group have combined effect?
+reading_model3v1 <- lm(transformed_reading ~ gender*parent_educ + wkly_study_hours*parent_educ + test_prep*parent_educ + ethnic_group*parent_educ, data = score_df)
+summary(reading_model3v1)
+
+### no significant interaction effect and adjusted R^2 decreasing so, not choosing these interactions
+
+### how about interaction between wkly study hour/parent marital status/test prep/ethnic group/lunch type
+reading_model3v2 <- lm(transformed_reading ~ gender + wkly_study_hours*parent_marital_status + test_prep*parent_marital_status + ethnic_group*parent_marital_status + lunch_type*parent_marital_status + parent_educ*parent_marital_status, data = score_df)
+summary(reading_model3v2)
+
+### adjusted R^2 slightly improved, only keeping significant interactions
+
+## how about only including some interaction between wkly_study_hr/ parent marital status/ parent educ
+reading_model3v3 <- lm(transformed_reading ~ gender + wkly_study_hours*parent_marital_status + test_prep + ethnic_group + lunch_type + parent_educ*parent_marital_status, data = score_df)
+summary(reading_model3v3)
+
+### no significant interaction effect and adjusted R^2 decreasing so, not choosing these interactions
+
+
+```
+
+```{r}
+reading_model3 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status + test_prep + ethnic_group + lunch_type + parent_educ*parent_marital_status, data = score_df)
 
 reading_model3 |> 
   broom::tidy() |> 
@@ -168,7 +191,6 @@ cooksd <- cooks.distance(reading_model3)
 influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
 ## no infleuntial points
 ```
-
 ```{r}
 ### adding transport means
 reading_model4v1 <- lm(reading_score ~ gender + wkly_study_hours*parent_marital_status + test_prep + ethnic_group + lunch_type + transport_means, data = score_df)
