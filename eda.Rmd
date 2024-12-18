@@ -17,28 +17,6 @@ library(gt)
 
 ```
 
-
-## Function to format the tables into word doc 
-
-Never mind I'm not using this anymore (the tables are huge and ugly and hard to format!!)
-
-```{r}
-
-# FitFlextableToPage <- function(ft, pgwidth = 7.5){
-#   ft_out <- ft %>% autofit()
-# 
-#   ft_out <- width(ft_out, width = dim(ft_out)$widths*pgwidth /(flextable_dim(ft_out)$widths))
-#   return(ft_out)
-# }
-
-# table1 %>% 
-#   as_flex_table() %>% 
-#   FitFlextableToPage() %>% 
-#   flextable::save_as_docx(path = "summarytable.docx")
-
-```
-
-
 ## Data Cleaning 
 
 Reading in + cleaning data
@@ -81,9 +59,9 @@ table1 <- score_df %>%
   add_overall() 
 table1
 
-table1 %>%
-  as_gt() %>%
-  gtsave(filename = "table1.png")
+# table1 %>%
+#   as_gt() %>%
+#   gtsave(filename = "table1.png")
 
 ```
 
@@ -106,9 +84,9 @@ table2 <- score_df %>%
   add_overall() 
 table2
 
-table2 %>%
-  as_gt() %>%
-  gtsave(filename = "table2.png")
+# table2 %>%
+#   as_gt() %>%
+#   gtsave(filename = "table2.png")
 
 ```
 
@@ -130,7 +108,7 @@ score_dists_plot <- score_long_df %>%
   labs(x = "Test Score", y = "Density")
 score_dists_plot
 
-ggsave("score_density.png")
+# ggsave("score_density.png")
 
 # Test for differences 
 
@@ -168,7 +146,7 @@ boxplots_study <- score_long_df %>% na.omit(wkly_study_hours) %>%
   labs(x = "Weekly Study Hours", y = "Test Score")
 boxplots_study
 
-ggsave("study_boxplots.png")
+# ggsave("study_boxplots.png")
 
 # Testing for differences in score distribution by study hour groups 
 
