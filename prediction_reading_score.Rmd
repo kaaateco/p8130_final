@@ -246,7 +246,7 @@ ggarrange(plot1, plot2, plot3, ncol = 3, common.legend = TRUE)
 
 Below is the 5-fold cross-validation results including fitted value versus observed score plot and performace metrices from each of the three models. 
 
-```{r Pred Reading Score, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
+```{r Pred Reading, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
 filtered_df |> 
   mutate(reading_model1_pred = (model1[["finalModel"]][["fitted.values"]])^(1/1.44) - 1, 
          reading_model2_pred = (model2[["finalModel"]][["fitted.values"]])^(1/1.44) - 1, 
@@ -270,10 +270,10 @@ bind_rows(model1$results, model2$results, model3$results) |>
 
 ```
 
-Based on the results, the model with the lowest RMSE value indicates highest accuracy. Therefore, the final model will be `reading_model2`.
+Based on the results, the model with the lowest RMSE value indicates highest accuracy. Therefore, the final model will be `reading_model2`
 ```{r}
 final_model = reading_model2
-summary(final_model)
+summary(reading_model2)
 ```
 
 
