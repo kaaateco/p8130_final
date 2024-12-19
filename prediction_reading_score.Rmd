@@ -48,7 +48,7 @@ score_df <- read_csv("Project_1_data.csv") |>
   select(,-c("math_score","writing_score"))
 ```
 
-We implement step-wise regression to deduce significant covariates for modeling `reading score`. We note that most of the variables listed are categorical as mentioned prior. Therefore, we incorporated factor releveing in order to give some dimensions. First, we will check for non-linearity in the scores and apply transformation if need be. 
+We implement step-wise regression to deduce significant covariates for modeling `reading score`. We note that most of the variables listed are categorical as mentioned prior. Therefore, we incorporated factor releveing in order to give some dimensions. First, we will check for non-linearity in the `reading_score` and apply transformation if need be. 
 
 ```{r Preliminary Model 1 for Reading Score}
 
@@ -79,7 +79,7 @@ optimal_power <- boxcox_reading |>
 
 ```
 
-```{r}
+```{r Transformation }
 # Transformed Y using the optimal lambda: 
 score_df <- score_df %>% 
   mutate(transformed_reading = (reading_score +1)^1.44)
@@ -117,11 +117,11 @@ summary(reading_model2v1)
 
 ### No significant interaction effect between `ethnic_group` and `parent educ` and adjusted R^2 value decreased. Too many covariates from the interaction. Will not be keeping this.
 
-# Add lunch_type covariate.
-reading_model2v2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+# Add lunch_type covariate and added interaction effect between `parent_marital_status` and `wkly_study_hours`
+reading_model2v2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status*wkly_study_hours, data = score_df)
 summary(reading_model2v2)
 
-### Significant interaction with lunch_type. However, ethnic_group variables demonstrates to be insignificant when lunch_type is added.
+### lunch_type is a significant term and the interaction also is significant.  However, ethnic_group variables demonstrates to be less significant when lunch_type is added.
 
 # Add interaction between `gender`/ `wkly_study_hours` / `test_prep` and `parent_educ`.
 reading_model2v3 <- lm(transformed_reading ~ gender + lunch_type + parent_marital_status + gender*parent_educ + test_prep*parent_educ, data = score_df)
@@ -130,8 +130,8 @@ summary(reading_model2v3)
 ## Some significant interaction effect between `test_prep` and `parent_educ` and adjusted R^2 slightly decreased so will be not be keeping these interactions. Keeping reading_model2v2. 
 ```
 
-```{r}
-reading_model2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+```{r Model 2}
+reading_model2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status*wkly_study_hours, data = score_df)
 
 reading_model2 |> 
   broom::tidy() |> 
@@ -174,7 +174,7 @@ summary(reading_model3v3)
 
 ```
 
-```{r}
+```{r Model 3}
 reading_model3 <- lm(transformed_reading ~ gender + lunch_type + is_first_child:parent_educ + parent_marital_status:wkly_study_hours + ethnic_group:test_prep, data = score_df)
 
 reading_model3 |> 
@@ -213,7 +213,7 @@ summary(reading_model4v2)
 ```
 
 ## Splitting dataset for cross validation
-```{r, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
+```{r CV, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
 #specify the cross-validation method
 set.seed(1)
 ctrl <- trainControl(method = "cv", number = 5)
@@ -224,7 +224,7 @@ filtered_df <- score_df |>
 #fit a regression model and use k-fold CV to evaluate performance
 model1 <- train(transformed_reading ~ gender + ethnic_group + parent_educ + test_prep + parent_marital_status + wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
 
-model2 <- train(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
+model2 <- train(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status*wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
 
 model3 <- train(transformed_reading ~ gender + lunch_type + is_first_child:parent_educ + parent_marital_status:wkly_study_hours + ethnic_group:test_prep, data = filtered_df, method = "lm", trControl = ctrl)
 
@@ -246,7 +246,7 @@ ggarrange(plot1, plot2, plot3, ncol = 3, common.legend = TRUE)
 
 Below is the 5-fold cross-validation results including fitted value versus observed score plot and performace metrices from each of the three models. 
 
-```{r, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
+```{r Pred Reading Score, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
 filtered_df |> 
   mutate(reading_model1_pred = (model1[["finalModel"]][["fitted.values"]])^(1/1.44) - 1, 
          reading_model2_pred = (model2[["finalModel"]][["fitted.values"]])^(1/1.44) - 1, 
@@ -270,10 +270,10 @@ bind_rows(model1$results, model2$results, model3$results) |>
 
 ```
 
-Based on the results, the model with the lowest RMSE value indicates highest accuracy. Therefore, the final model will be `reading_model2`
+Based on the results, the model with the lowest RMSE value indicates highest accuracy. Therefore, the final model will be `reading_model2`.
 ```{r}
 final_model = reading_model2
-summary(reading_model2)
+summary(final_model)
 ```
 
 

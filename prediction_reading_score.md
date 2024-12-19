@@ -300,50 +300,81 @@ summary(reading_model2v1)
 ``` r
 ### No significant interaction effect between `ethnic_group` and `parent educ` and adjusted R^2 value decreased. Too many covariates from the interaction. Will not be keeping this.
 
-# Add lunch_type covariate.
-reading_model2v2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+# Add lunch_type covariate and added interaction effect between `parent_marital_status` and `wkly_study_hours`
+reading_model2v2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status*wkly_study_hours, data = score_df)
 summary(reading_model2v2)
 ```
 
     ## 
     ## Call:
     ## lm(formula = transformed_reading ~ gender + parent_educ + lunch_type + 
-    ##     ethnic_group + test_prep + parent_marital_status + wkly_study_hours, 
-    ##     data = score_df)
+    ##     ethnic_group + test_prep + parent_marital_status + wkly_study_hours + 
+    ##     parent_marital_status * wkly_study_hours, data = score_df)
     ## 
     ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -304.377  -84.075   -0.502   87.336  300.484 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -347.49  -80.64   -2.18   88.20  319.93 
     ## 
     ## Coefficients:
-    ##                               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)                    501.466     25.910  19.354  < 2e-16 ***
-    ## gendermale                     -73.109     10.200  -7.167 2.38e-12 ***
-    ## parent_educassociate's degree   44.436     15.863   2.801 0.005264 ** 
-    ## parent_educbachelor's degree    68.744     18.611   3.694 0.000242 ***
-    ## parent_educhigh school          -4.800     16.077  -0.299 0.765353    
-    ## parent_educmaster's degree      82.776     22.700   3.647 0.000290 ***
-    ## parent_educsome college         22.055     16.264   1.356 0.175613    
-    ## lunch_typefree/reduced         -77.600     10.554  -7.353 6.79e-13 ***
-    ## ethnic_groupgroup B            -14.196     20.714  -0.685 0.493400    
-    ## ethnic_groupgroup C             -8.707     19.823  -0.439 0.660660    
-    ## ethnic_groupgroup D             21.702     19.942   1.088 0.276951    
-    ## ethnic_groupgroup E             52.502     21.874   2.400 0.016706 *  
-    ## test_prepnone                  -59.521     10.684  -5.571 3.91e-08 ***
-    ## parent_marital_statusdivorced  -16.893     16.450  -1.027 0.304882    
-    ## parent_marital_statusmarried    29.925     12.367   2.420 0.015844 *  
-    ## parent_marital_statuswidowed    34.210     33.268   1.028 0.304236    
-    ## wkly_study_hours5-10            25.125     12.026   2.089 0.037139 *  
-    ## wkly_study_hours> 10            12.947     15.707   0.824 0.410113    
+    ##                                                    Estimate Std. Error t value
+    ## (Intercept)                                         463.192     29.824  15.531
+    ## gendermale                                          -71.429     10.220  -6.989
+    ## parent_educassociate's degree                        45.411     15.859   2.863
+    ## parent_educbachelor's degree                         70.884     18.634   3.804
+    ## parent_educhigh school                               -7.697     16.110  -0.478
+    ## parent_educmaster's degree                           83.598     22.656   3.690
+    ## parent_educsome college                              23.006     16.228   1.418
+    ## lunch_typefree/reduced                              -78.070     10.569  -7.386
+    ## ethnic_groupgroup B                                 -10.900     20.646  -0.528
+    ## ethnic_groupgroup C                                  -6.444     19.756  -0.326
+    ## ethnic_groupgroup D                                  24.879     19.863   1.253
+    ## ethnic_groupgroup E                                  55.830     21.772   2.564
+    ## test_prepnone                                       -59.990     10.642  -5.637
+    ## parent_marital_statusdivorced                        46.634     32.321   1.443
+    ## parent_marital_statusmarried                         72.135     23.073   3.126
+    ## parent_marital_statuswidowed                        129.611     88.150   1.470
+    ## wkly_study_hours5-10                                 64.224     23.978   2.679
+    ## wkly_study_hours> 10                                 93.013     31.065   2.994
+    ## parent_marital_statusdivorced:wkly_study_hours5-10  -62.714     38.919  -1.611
+    ## parent_marital_statusmarried:wkly_study_hours5-10   -48.107     28.466  -1.690
+    ## parent_marital_statuswidowed:wkly_study_hours5-10  -110.633     96.890  -1.142
+    ## parent_marital_statusdivorced:wkly_study_hours> 10 -166.633     51.146  -3.258
+    ## parent_marital_statusmarried:wkly_study_hours> 10   -91.362     36.952  -2.472
+    ## parent_marital_statuswidowed:wkly_study_hours> 10  -140.502    124.991  -1.124
+    ##                                                    Pr(>|t|)    
+    ## (Intercept)                                         < 2e-16 ***
+    ## gendermale                                         7.87e-12 ***
+    ## parent_educassociate's degree                      0.004348 ** 
+    ## parent_educbachelor's degree                       0.000158 ***
+    ## parent_educhigh school                             0.633007    
+    ## parent_educmaster's degree                         0.000246 ***
+    ## parent_educsome college                            0.156833    
+    ## lunch_typefree/reduced                             5.47e-13 ***
+    ## ethnic_groupgroup B                                0.597739    
+    ## ethnic_groupgroup C                                0.744423    
+    ## ethnic_groupgroup D                                0.210903    
+    ## ethnic_groupgroup E                                0.010598 *  
+    ## test_prepnone                                      2.74e-08 ***
+    ## parent_marital_statusdivorced                      0.149624    
+    ## parent_marital_statusmarried                       0.001861 ** 
+    ## parent_marital_statuswidowed                       0.142025    
+    ## wkly_study_hours5-10                               0.007611 ** 
+    ## wkly_study_hours> 10                               0.002873 ** 
+    ## parent_marital_statusdivorced:wkly_study_hours5-10 0.107653    
+    ## parent_marital_statusmarried:wkly_study_hours5-10  0.091585 .  
+    ## parent_marital_statuswidowed:wkly_study_hours5-10  0.254009    
+    ## parent_marital_statusdivorced:wkly_study_hours> 10 0.001190 ** 
+    ## parent_marital_statusmarried:wkly_study_hours> 10  0.013713 *  
+    ## parent_marital_statuswidowed:wkly_study_hours> 10  0.261453    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 121.3 on 569 degrees of freedom
-    ## Multiple R-squared:  0.2692, Adjusted R-squared:  0.2474 
-    ## F-statistic: 12.33 on 17 and 569 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 120.6 on 563 degrees of freedom
+    ## Multiple R-squared:  0.2852, Adjusted R-squared:  0.256 
+    ## F-statistic: 9.766 on 23 and 563 DF,  p-value: < 2.2e-16
 
 ``` r
-### Significant interaction with lunch_type. However, ethnic_group variables demonstrates to be insignificant when lunch_type is added.
+### lunch_type is a significant term and the interaction also is significant.  However, ethnic_group variables demonstrates to be less significant when lunch_type is added.
 
 # Add interaction between `gender`/ `wkly_study_hours` / `test_prep` and `parent_educ`.
 reading_model2v3 <- lm(transformed_reading ~ gender + lunch_type + parent_marital_status + gender*parent_educ + test_prep*parent_educ, data = score_df)
@@ -418,7 +449,7 @@ summary(reading_model2v3)
 ```
 
 ``` r
-reading_model2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+reading_model2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status*wkly_study_hours, data = score_df)
 
 reading_model2 |> 
   broom::tidy() |> 
@@ -430,26 +461,32 @@ reading_model2 |>
   knitr::kable(digits = 50)
 ```
 
-| term                          | estimate | std.error | statistic |  p.value |
-|:------------------------------|---------:|----------:|----------:|---------:|
-| (Intercept)                   |  501.466 |    25.910 |    19.354 | 0.00e+00 |
-| gendermale                    |  -73.109 |    10.200 |    -7.167 | 2.38e-12 |
-| parent_educassociate’s degree |   44.436 |    15.863 |     2.801 | 5.26e-03 |
-| parent_educbachelor’s degree  |   68.744 |    18.611 |     3.694 | 2.42e-04 |
-| parent_educhigh school        |   -4.800 |    16.077 |    -0.299 | 7.65e-01 |
-| parent_educmaster’s degree    |   82.776 |    22.700 |     3.647 | 2.90e-04 |
-| parent_educsome college       |   22.055 |    16.264 |     1.356 | 1.76e-01 |
-| lunch_typefree/reduced        |  -77.600 |    10.554 |    -7.353 | 6.79e-13 |
-| ethnic_groupgroup B           |  -14.196 |    20.714 |    -0.685 | 4.93e-01 |
-| ethnic_groupgroup C           |   -8.707 |    19.823 |    -0.439 | 6.61e-01 |
-| ethnic_groupgroup D           |   21.702 |    19.942 |     1.088 | 2.77e-01 |
-| ethnic_groupgroup E           |   52.502 |    21.874 |     2.400 | 1.67e-02 |
-| test_prepnone                 |  -59.521 |    10.684 |    -5.571 | 3.91e-08 |
-| parent_marital_statusdivorced |  -16.893 |    16.450 |    -1.027 | 3.05e-01 |
-| parent_marital_statusmarried  |   29.925 |    12.367 |     2.420 | 1.58e-02 |
-| parent_marital_statuswidowed  |   34.210 |    33.268 |     1.028 | 3.04e-01 |
-| wkly_study_hours5-10          |   25.125 |    12.026 |     2.089 | 3.71e-02 |
-| wkly_study_hours\> 10         |   12.947 |    15.707 |     0.824 | 4.10e-01 |
+| term | estimate | std.error | statistic | p.value |
+|:---|---:|---:|---:|---:|
+| (Intercept) | 463.192 | 29.824 | 15.531 | 1.56e-45 |
+| gendermale | -71.429 | 10.220 | -6.989 | 7.87e-12 |
+| parent_educassociate’s degree | 45.411 | 15.859 | 2.863 | 4.35e-03 |
+| parent_educbachelor’s degree | 70.884 | 18.634 | 3.804 | 1.58e-04 |
+| parent_educhigh school | -7.697 | 16.110 | -0.478 | 6.33e-01 |
+| parent_educmaster’s degree | 83.598 | 22.656 | 3.690 | 2.46e-04 |
+| parent_educsome college | 23.006 | 16.228 | 1.418 | 1.57e-01 |
+| lunch_typefree/reduced | -78.070 | 10.569 | -7.386 | 5.47e-13 |
+| ethnic_groupgroup B | -10.900 | 20.646 | -0.528 | 5.98e-01 |
+| ethnic_groupgroup C | -6.444 | 19.756 | -0.326 | 7.44e-01 |
+| ethnic_groupgroup D | 24.879 | 19.863 | 1.253 | 2.11e-01 |
+| ethnic_groupgroup E | 55.830 | 21.772 | 2.564 | 1.06e-02 |
+| test_prepnone | -59.990 | 10.642 | -5.637 | 2.74e-08 |
+| parent_marital_statusdivorced | 46.634 | 32.321 | 1.443 | 1.50e-01 |
+| parent_marital_statusmarried | 72.135 | 23.073 | 3.126 | 1.86e-03 |
+| parent_marital_statuswidowed | 129.611 | 88.150 | 1.470 | 1.42e-01 |
+| wkly_study_hours5-10 | 64.224 | 23.978 | 2.679 | 7.61e-03 |
+| wkly_study_hours\> 10 | 93.013 | 31.065 | 2.994 | 2.87e-03 |
+| parent_marital_statusdivorced:wkly_study_hours5-10 | -62.714 | 38.919 | -1.611 | 1.08e-01 |
+| parent_marital_statusmarried:wkly_study_hours5-10 | -48.107 | 28.466 | -1.690 | 9.16e-02 |
+| parent_marital_statuswidowed:wkly_study_hours5-10 | -110.633 | 96.890 | -1.142 | 2.54e-01 |
+| parent_marital_statusdivorced:wkly_study_hours\> 10 | -166.633 | 51.146 | -3.258 | 1.19e-03 |
+| parent_marital_statusmarried:wkly_study_hours\> 10 | -91.362 | 36.952 | -2.472 | 1.37e-02 |
+| parent_marital_statuswidowed:wkly_study_hours\> 10 | -140.502 | 124.991 | -1.124 | 2.61e-01 |
 
 ``` r
 par(mfrow = c(2,2))
@@ -994,7 +1031,7 @@ filtered_df <- score_df |>
 #fit a regression model and use k-fold CV to evaluate performance
 model1 <- train(transformed_reading ~ gender + ethnic_group + parent_educ + test_prep + parent_marital_status + wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
 
-model2 <- train(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
+model2 <- train(transformed_reading ~ gender + parent_educ + lunch_type + ethnic_group + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status*wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
 
 model3 <- train(transformed_reading ~ gender + lunch_type + is_first_child:parent_educ + parent_marital_status:wkly_study_hours + ethnic_group:test_prep, data = filtered_df, method = "lm", trControl = ctrl)
 
@@ -1049,7 +1086,7 @@ bind_rows(model1$results, model2$results, model3$results) |>
 | model_id | intercept |    RMSE | Rsquared |     MAE | RMSESD | RsquaredSD | MAESD |
 |---------:|:----------|--------:|---------:|--------:|-------:|-----------:|------:|
 |        1 | TRUE      | 129.251 |    0.160 | 104.486 |  6.984 |      0.067 | 6.426 |
-|        2 | TRUE      | 121.815 |    0.243 |  99.248 |  6.277 |      0.055 | 5.473 |
+|        2 | TRUE      | 121.818 |    0.244 |  99.713 |  5.941 |      0.055 | 5.328 |
 |        3 | TRUE      | 124.509 |    0.214 | 102.166 |  2.568 |      0.014 | 2.064 |
 
 Performance matrices of the 3 Multiple Linear Regression Models
@@ -1065,36 +1102,67 @@ summary(reading_model2)
     ## 
     ## Call:
     ## lm(formula = transformed_reading ~ gender + parent_educ + lunch_type + 
-    ##     ethnic_group + test_prep + parent_marital_status + wkly_study_hours, 
-    ##     data = score_df)
+    ##     ethnic_group + test_prep + parent_marital_status + wkly_study_hours + 
+    ##     parent_marital_status * wkly_study_hours, data = score_df)
     ## 
     ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -304.377  -84.075   -0.502   87.336  300.484 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -347.49  -80.64   -2.18   88.20  319.93 
     ## 
     ## Coefficients:
-    ##                               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)                    501.466     25.910  19.354  < 2e-16 ***
-    ## gendermale                     -73.109     10.200  -7.167 2.38e-12 ***
-    ## parent_educassociate's degree   44.436     15.863   2.801 0.005264 ** 
-    ## parent_educbachelor's degree    68.744     18.611   3.694 0.000242 ***
-    ## parent_educhigh school          -4.800     16.077  -0.299 0.765353    
-    ## parent_educmaster's degree      82.776     22.700   3.647 0.000290 ***
-    ## parent_educsome college         22.055     16.264   1.356 0.175613    
-    ## lunch_typefree/reduced         -77.600     10.554  -7.353 6.79e-13 ***
-    ## ethnic_groupgroup B            -14.196     20.714  -0.685 0.493400    
-    ## ethnic_groupgroup C             -8.707     19.823  -0.439 0.660660    
-    ## ethnic_groupgroup D             21.702     19.942   1.088 0.276951    
-    ## ethnic_groupgroup E             52.502     21.874   2.400 0.016706 *  
-    ## test_prepnone                  -59.521     10.684  -5.571 3.91e-08 ***
-    ## parent_marital_statusdivorced  -16.893     16.450  -1.027 0.304882    
-    ## parent_marital_statusmarried    29.925     12.367   2.420 0.015844 *  
-    ## parent_marital_statuswidowed    34.210     33.268   1.028 0.304236    
-    ## wkly_study_hours5-10            25.125     12.026   2.089 0.037139 *  
-    ## wkly_study_hours> 10            12.947     15.707   0.824 0.410113    
+    ##                                                    Estimate Std. Error t value
+    ## (Intercept)                                         463.192     29.824  15.531
+    ## gendermale                                          -71.429     10.220  -6.989
+    ## parent_educassociate's degree                        45.411     15.859   2.863
+    ## parent_educbachelor's degree                         70.884     18.634   3.804
+    ## parent_educhigh school                               -7.697     16.110  -0.478
+    ## parent_educmaster's degree                           83.598     22.656   3.690
+    ## parent_educsome college                              23.006     16.228   1.418
+    ## lunch_typefree/reduced                              -78.070     10.569  -7.386
+    ## ethnic_groupgroup B                                 -10.900     20.646  -0.528
+    ## ethnic_groupgroup C                                  -6.444     19.756  -0.326
+    ## ethnic_groupgroup D                                  24.879     19.863   1.253
+    ## ethnic_groupgroup E                                  55.830     21.772   2.564
+    ## test_prepnone                                       -59.990     10.642  -5.637
+    ## parent_marital_statusdivorced                        46.634     32.321   1.443
+    ## parent_marital_statusmarried                         72.135     23.073   3.126
+    ## parent_marital_statuswidowed                        129.611     88.150   1.470
+    ## wkly_study_hours5-10                                 64.224     23.978   2.679
+    ## wkly_study_hours> 10                                 93.013     31.065   2.994
+    ## parent_marital_statusdivorced:wkly_study_hours5-10  -62.714     38.919  -1.611
+    ## parent_marital_statusmarried:wkly_study_hours5-10   -48.107     28.466  -1.690
+    ## parent_marital_statuswidowed:wkly_study_hours5-10  -110.633     96.890  -1.142
+    ## parent_marital_statusdivorced:wkly_study_hours> 10 -166.633     51.146  -3.258
+    ## parent_marital_statusmarried:wkly_study_hours> 10   -91.362     36.952  -2.472
+    ## parent_marital_statuswidowed:wkly_study_hours> 10  -140.502    124.991  -1.124
+    ##                                                    Pr(>|t|)    
+    ## (Intercept)                                         < 2e-16 ***
+    ## gendermale                                         7.87e-12 ***
+    ## parent_educassociate's degree                      0.004348 ** 
+    ## parent_educbachelor's degree                       0.000158 ***
+    ## parent_educhigh school                             0.633007    
+    ## parent_educmaster's degree                         0.000246 ***
+    ## parent_educsome college                            0.156833    
+    ## lunch_typefree/reduced                             5.47e-13 ***
+    ## ethnic_groupgroup B                                0.597739    
+    ## ethnic_groupgroup C                                0.744423    
+    ## ethnic_groupgroup D                                0.210903    
+    ## ethnic_groupgroup E                                0.010598 *  
+    ## test_prepnone                                      2.74e-08 ***
+    ## parent_marital_statusdivorced                      0.149624    
+    ## parent_marital_statusmarried                       0.001861 ** 
+    ## parent_marital_statuswidowed                       0.142025    
+    ## wkly_study_hours5-10                               0.007611 ** 
+    ## wkly_study_hours> 10                               0.002873 ** 
+    ## parent_marital_statusdivorced:wkly_study_hours5-10 0.107653    
+    ## parent_marital_statusmarried:wkly_study_hours5-10  0.091585 .  
+    ## parent_marital_statuswidowed:wkly_study_hours5-10  0.254009    
+    ## parent_marital_statusdivorced:wkly_study_hours> 10 0.001190 ** 
+    ## parent_marital_statusmarried:wkly_study_hours> 10  0.013713 *  
+    ## parent_marital_statuswidowed:wkly_study_hours> 10  0.261453    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 121.3 on 569 degrees of freedom
-    ## Multiple R-squared:  0.2692, Adjusted R-squared:  0.2474 
-    ## F-statistic: 12.33 on 17 and 569 DF,  p-value: < 2.2e-16
+    ## Residual standard error: 120.6 on 563 degrees of freedom
+    ## Multiple R-squared:  0.2852, Adjusted R-squared:  0.256 
+    ## F-statistic: 9.766 on 23 and 563 DF,  p-value: < 2.2e-16
