@@ -1,5 +1,5 @@
 ---
-title: "writing_score_prediction"
+title: "Predicting Reading Score"
 author: "Jeong Yun Choi"
 date: "2024-12-15"
 output: github_document
@@ -48,27 +48,28 @@ score_df <- read_csv("Project_1_data.csv") |>
   select(,-c("math_score","writing_score"))
 ```
 
-We implement step-wise regression to deduce significant covariates for modeling `reading` score`. We note that most of the variables listed are categorical. Therefore, we incorporated factor releveing in order to give some dimensions. First, we will check for non-linearity in the scores and apply transformation if need be. 
+We implement step-wise regression to deduce significant covariates for modeling `reading score`. We note that most of the variables listed are categorical as mentioend prior. Therefore, we incorporated factor releveing in order to give some dimensions. First, we will check for non-linearity in the scores and apply transformation if need be. 
 
 ```{r Preliminary Model 1 for Reading Score}
 
 # Preliminary using all covariates for the first model
 reading_model1v1 <- lm(reading_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + transport_means + wkly_study_hours, data = score_df)
 
-summary(reading_model1)
+summary(reading_model1v1)
 
 
 ###covariates practice_sports, is_first_child, nr_siblings, transport_means are not significant
 
-reading_model1v2 <- lm(reading_score ~ gender + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+reading_model1v2 <- lm(reading_score ~ gender + ethnic_group + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
 summary(reading_model1v2)
 
 #increased adjusted R^2 value. Will be keeping this model.
 
-reading_model1<- lm(reading_score ~ gender + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+reading_model1<- lm(reading_score ~ gender + ethnic_group + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
 
 par(mfrow = c(1,1))
 boxcox_reading <- MASS::boxcox(reading_model1, lambda = seq(-2.5, 2.5, 0.1))
+shapiro.test(rstandard(reading_model1))
 
 boxcox_reading <- Reduce(cbind, boxcox_reading)
 optimal_power <- boxcox_reading |> 
@@ -84,7 +85,8 @@ optimal_power <- boxcox_reading |>
 score_df <- score_df %>% 
   mutate(transformed_reading = (reading_score +1)^1.44)
 
-reading_model1 = lm(transformed_reading ~ gender + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+#adjusted some relevant covariates
+reading_model1 = lm(transformed_reading ~ gender + ethnic_group + parent_educ + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
 
 reading_model1 %>% 
   broom::tidy() %>% 
@@ -98,7 +100,7 @@ reading_model1 %>%
 par(mfrow = c(2,2))
 plot(reading_model1)
 shapiro.test(rstandard(reading_model1))
-##shapiro test fails to reject null, normality is assumed. 
+##After transforming, shapiro test fails to reject null, indicating normality in the distribution 
 
 ### removing the influential point if needed
 cooksd_read <- cooks.distance(reading_model1)
@@ -110,26 +112,27 @@ As seen above the after Y transformation where $Y^*= ({reading\_score + 1})^{1.4
 
 ## Refined Covariates
 ```{r}
-### Remove non-significant predictors
-reading_model2v1 <- lm(transformed_reading ~ gender + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = score_df)
+### Add interaction between `ethnic_group` and `parent_educ`.
+reading_model2v1 <- lm(transformed_reading ~ gender + test_prep + parent_marital_status + wkly_study_hours + ethnic_group:parent_educ, data = score_df)
 summary(reading_model2v1)
-### adjusted R^2 value decreased by a little but it was not a significant decrease.
 
-# Add interaction between `parent_marital_status` and `wkly_study_hours` and `parent_educ`
-reading_model2v2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status:parent_educ + wkly_study_hours:parent_educ, data = score_df)
+### No significant interaction effect between `ethnic_group` and `parent educ` and adjusted R^2 value decreased. Will not be keeping this.
+
+# Add interaction between `parent_marital_status` and `wkly_study_hours` and `parent_educ`, added lunch_type covariate. Deleted ethnic group.
+reading_model2v2 <- lm(transformed_reading ~ gender + lunch_type + test_prep + parent_marital_status:parent_educ + wkly_study_hours:parent_educ, data = score_df)
 summary(reading_model2v2)
 
-### Some significant interaction effect between `parent_marital_status` and `parent_educ` and adjusted R^2 slightly improved so will be keeping these interactions.
+### Some significant interaction effect between `parent_marital_status` and `parent_educ`. `lunch_type` demonstrates to be significant and adjusted R^2 slightly improved so will be keeping these interactions and new covariate.
 
 # Add interaction between `gender`/ `wkly_study_hours` / `test_prep` and `parent_educ`.
-reading_model2v3 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + test_prep + parent_marital_status + wkly_study_hours +gender:parent_educ + wkly_study_hours:parent_educ + test_prep:parent_educ, data = score_df)
+reading_model2v3 <- lm(transformed_reading ~ gender + lunch_type + parent_marital_status +gender:parent_educ + wkly_study_hours:parent_educ + test_prep:parent_educ, data = score_df)
 summary(reading_model2v3)
 
-## One significant interaction effect between `wkly_study_hours` and `parent_educ` and adjusted R^2 slightly decreased so will be not be keeping these interactions. Keeping reading_model2v2. 
+## Some significant interaction effect between `wkly_study_hours` and `parent_educ` and adjusted R^2 slightly decreased so will be not be keeping these interactions. Keeping reading_model2v2. 
 ```
 
 ```{r}
-reading_model2 <- lm(transformed_reading ~ gender + parent_educ + lunch_type + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status:parent_educ + wkly_study_hours:parent_educ, data = score_df)
+reading_model2 <- lm(transformed_reading ~ gender + lunch_type + test_prep + parent_marital_status:parent_educ + wkly_study_hours:parent_educ, data = score_df)
 
 reading_model2 |> 
   broom::tidy() |> 
@@ -137,42 +140,43 @@ reading_model2 |>
          estimate = round(estimate, 3), 
          `std.error` = round(`std.error`, 3), 
          statistic = round(statistic, 3)) |> 
+  drop_na()|>
   knitr::kable(digits = 50)
 
 par(mfrow = c(2,2))
 plot(reading_model2)
-shapiro.test(rstandard(reading_model2))
 
 ### removing the influential point if needed
-cooksd <- cooks.distance(math_model2)
-influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+cooksd <- cooks.distance(reading_model2)
+cooksd_clean <- cooksd[!is.na(cooksd)]
+influential <- as.numeric(names(cooksd_clean)[(cooksd_clean > 0.5)])
 # influential_read is 0
 ```
 
 ```{r}
-### does the interaction between /wkly study hour/test_prep/parent_educ and parent_educ have combined effect?
-reading_model3v1 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + gender:parent_educ + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours, data = score_df)
+### Add 3 way interaction between `test_prep`, `parent_educ` and `wkly_study_hours`
+reading_model3v1 <- lm(transformed_reading ~ gender + lunch_type + test_prep:parent_educ:wkly_study_hours, data = score_df)
 summary(reading_model3v1)
 
-### significant 3-way interaction effect and adjusted R^2 decreased slightly. Will be keeping this.
+### Some significant 3-way interaction effect and adjusted R^2 decreased only slightly.
 
-### how about interaction between ethnic_group/test_preps/parent_marital_status
-reading_model3v2 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status, data = score_df)
+### Keep wkly_study_hours and parent_educ interaction term. Add 3 way interaction between `test_prep`, `parent_educ` and `wkly_study_hours` and `ethnic_group`, `test_prep` and `parent_marital_status`
+reading_model3v2 <- lm(transformed_reading ~ gender + lunch_type + wkly_study_hours:parent_educ + parent_marital_status:wkly_study_hours + ethnic_group:test_prep, data = score_df)
 summary(reading_model3v2)
 
-### significant 3-way interaction effect and adjusted R^2 increased slightly. Will be keeping this.
+### significant 3-way interaction effect and adjusted R^2 increased slightly.
 
-## how about only including some interaction between wkly_study_hr/ parent marital status/ parent educ
-reading_model3v3 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status+ gender:test_prep:parent_educ, data = score_df)
+## Add 3 way interaction between `ethnic_group`, `parent_educ`, `parent_marital_status`, and `gender`, `test_prep`, and `parent_educ`.
+reading_model3v3 <- lm(transformed_reading ~ gender + lunch_type + ethnic_group:parent_educ:parent_marital_status+ gender:test_prep:parent_educ, data = score_df)
 summary(reading_model3v3)
-### Some significant 3-way interaction effect but the adjusted R^2 decreasing so, not choosing these interactions
+### Some significant 3-way interaction effect but the adjusted R^2 decreasing so not choosing these interactions
 
 ### will be keeping model3v2
 
 ```
 
 ```{r}
-reading_model3 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status, data = score_df)
+reading_model3 <- lm(transformed_reading ~ gender + lunch_type + wkly_study_hours:parent_educ + parent_marital_status:wkly_study_hours + ethnic_group:test_prep, data = score_df)
 
 reading_model3 |> 
   broom::tidy() |> 
@@ -185,7 +189,6 @@ reading_model3 |>
 
 par(mfrow = c(2,2))
 plot(reading_model3)
-shapiro.test(rstandard(reading_model3))
 
 ### removing the influential point if needed
 cooksd <- cooks.distance(reading_model3)
@@ -195,20 +198,21 @@ influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
 
 
 ```{r}
-### four-way interaction term
-reading_model4v1 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status + test_prep:wkly_study_hours:parent_educ:ethnic_group, data = score_df)
+### Keeping one of the three-way interaction term and adding another covariate `practice_sports`
+reading_model4v1 <- lm(transformed_reading ~ lunch_type + parent_marital_status + practice_sport +  wkly_study_hours + test_prep:gender:parent_educ:ethnic_group, data = score_df)
 summary(reading_model4v1)
 
-### Only some significant interaction effect between `test_prep`, `wkly_study_hours`, `parent_educ` and `ethnic_group`.  adjusted R^2 slightly decreased so we will not be keeping these interactions
+### sports covariate demosntrates to not be significant and adjusted R^2 slightly decreased compared to reading_model3
 
-### four-way interaction term
-reading_model4v2 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status + test_prep:parent_educ:parent_marital_status:wkly_study_hours, data = score_df)
+### Keeping one of the three-way interaction term between `ethnic_group`,`test_prep`, and `parent_marital_status` and adding four-way interaction between `test_prep`,`parent_educ`,`parent_marital_status`,and `wkly_study_hours`
+reading_model4v2 <- lm(transformed_reading ~ gender + lunch_type + ethnic_group:test_prep:parent_marital_status + test_prep:parent_educ:parent_marital_status:wkly_study_hours, data = score_df)
 summary(reading_model4v2)
 
 ### Some significant interaction effect between `test_prep`, `parent_educ`, `parent_marital_status`, and `wkly_study_hours` and adjusted R^2 slightly increased. Will be keeping this.
 ```
+
 ```{r}
-reading_model4 <- lm(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status + test_prep:parent_educ:parent_marital_status:wkly_study_hours, data = score_df)
+reading_model4 <- lm(transformed_reading ~ gender + lunch_type + ethnic_group:test_prep:parent_marital_status + test_prep:parent_educ:parent_marital_status:wkly_study_hours, data = score_df)
 
 reading_model4 |> 
   broom::tidy() |> 
@@ -221,15 +225,17 @@ reading_model4 |>
 
 par(mfrow = c(2,2))
 plot(reading_model4)
-shapiro.test(rstandard(reading_model4))
 
 ### removing the influential point if needed
 cooksd <- cooks.distance(reading_model4)
-influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+# Remove NA values from Cook's distance
+cooksd_clean <- cooksd[!is.na(cooksd)]
+influential <- as.numeric(names(cooksd_clean)[(cooksd_clean > 0.5)])
 ## no influential points
 
 ### will test reading_model1, reading_model2 and reading_model3 and reading_model4
 ```
+
 
 ## Splitting dataset for cross validation
 ```{r, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 4, out.width = "95%", dpi = 600}
@@ -237,18 +243,17 @@ influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
 set.seed(1)
 ctrl <- trainControl(method = "cv", number = 5)
 
-
 filtered_df <- score_df |> 
   drop_na(gender, parent_educ, test_prep, lunch_type, parent_marital_status, wkly_study_hours, ethnic_group)
 
 #fit a regression model and use k-fold CV to evaluate performance
-model1 <- train(transformed_reading ~ gender + parent_educ +lunch_type + test_prep + parent_marital_status + wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
+model1 <- train(transformed_reading ~ gender + ethnic_group + parent_educ + test_prep + parent_marital_status + wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
 
-model2 <- train(transformed_reading ~ gender + parent_educ + lunch_type + test_prep + parent_marital_status + wkly_study_hours + parent_marital_status:parent_educ + wkly_study_hours:parent_educ, data = filtered_df, method = "lm", trControl = ctrl)
+model2 <- train(transformed_reading ~ gender + lunch_type + test_prep + parent_marital_status:parent_educ + wkly_study_hours:parent_educ, data = filtered_df, method = "lm", trControl = ctrl)
 
-model3 <- train(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status, data = filtered_df, method = "lm", trControl = ctrl)
+model3 <- train(transformed_reading ~ gender + lunch_type + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status, data = filtered_df, method = "lm", trControl = ctrl)
     
-model4 <- train(transformed_reading ~ gender + parent_educ + test_prep + lunch_type + parent_marital_status + wkly_study_hours + wkly_study_hours:parent_educ + test_prep:parent_educ:wkly_study_hours + ethnic_group:test_prep:parent_marital_status + test_prep:parent_educ:parent_marital_status:wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
+model4 <- train(transformed_reading ~ gender + lunch_type + ethnic_group:test_prep:parent_marital_status + test_prep:parent_educ:parent_marital_status:wkly_study_hours, data = filtered_df, method = "lm", trControl = ctrl)
 
 # get fold subsets
 fold_data_model1 <- lapply(model1$control$index, function(index) filtered_df[index,]) |> 
@@ -296,6 +301,6 @@ bind_rows(model1$results, model2$results, model3$results, model4$results) |>
 
 ```
 
-
+Based on the results, the model with the lowest RMSE value indicates highest accuracy. Therefore, the final model will be `reading_model2`
 
 
