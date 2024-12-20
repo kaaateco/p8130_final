@@ -1,0 +1,1107 @@
+---
+title: "math_prediction"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(PerformanceAnalytics)
+library(rstatix)
+library(gtools)
+library(tidyverse)
+library(ggplot2)
+library(caret)
+library(ggpubr)
+library(dplyr)
+library(leaps)
+library(glmnet)
+library(caret)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 7, 
+  fig.height = 5,
+  out.width = "90%", 
+	fig.align = "center"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+
+theme_set(theme_minimal())
+
+set.seed(1)
+```
+
+```{r, include=FALSE}
+score_df <- read_csv("Project_1_data.csv") |>  
+  janitor::clean_names() |>  
+  mutate(wkly_study_hours = 
+           case_match(
+             wkly_study_hours, 
+             "< 5" ~ "< 5",
+             "> 10" ~ "> 10", 
+             "10-May" ~ "5-10"), 
+         wkly_study_hours = factor(wkly_study_hours, c("< 5", "5-10", "> 10")), 
+         lunch_type = fct_relevel(lunch_type, "standard"), 
+         parent_marital_status = fct_relevel(parent_marital_status, "single"), 
+         transport_means = fct_relevel(transport_means, "school_bus"), 
+         parent_educ = fct_relevel(parent_educ, "some high school"))
+```
+
+Firstly, we were interested in identifying any covariates are associated with each other or not. There are ten categorical potential predictors for which we first tested for chi-squared test for each pair of two variables. However, there wasn't enough evidence suggesting association between any two categorical variables.
+```{r, echo=FALSE}
+cat_columns <- names(score_df)[c(1:8, 10:11)]
+comparisons <- combn(cat_columns, 2, simplify = FALSE)
+
+categorical_df <- score_df[, cat_columns] |> 
+  drop_na()
+  
+chiseq_test <- lapply(comparisons, function(x){
+  categorical_df <- score_df |> 
+    dplyr::select(x[1], x[2]) |> 
+    drop_na()
+  res = chisq.test(table(categorical_df), 
+                   correct = TRUE) |> 
+    broom::tidy() |> 
+    mutate(group = paste(x[1], x[2], sep = ":"), 
+           `p.value` = signif(`p.value`, 3), 
+           statistic = round(statistic, 3))
+  
+  return(res)
+})
+
+chiseq_test <- bind_rows(chiseq_test) 
+
+chiseq_test |> 
+  dplyr::select(statistic, `p.value`, group) |> 
+  arrange(`p.value`) |> 
+  head(2) |> 
+  knitr::kable(caption = "Chi-Squared Test: Top 2 results (NS)")
+```
+
+The remaining continuous variable, `nr_siblings`, that measure number of siblings was tested against all the categorical variables to test for number of sibling differs between different categorical variables. Number of siblings were different between students who were the first child versus those who were not, also between students with different number of weekly study hours. We needed to account for both `is_first_child` and `wkly_study_hours`, if number of siblings were to be included the model.  
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 6, out.width = "95%", dpi = 600}
+grouped_df <- score_df |> 
+      pivot_longer(
+        cols = c(1:8, 10:11), 
+        names_to = "cat_group", 
+        values_to = "cat_val") |> 
+  drop_na() 
+
+boxplot_groups <- grouped_df |> 
+  ggplot(aes(x = cat_val, y = nr_siblings, fill = cat_group)) +
+  geom_boxplot(alpha = 0.6) + 
+  labs(y = "Count",
+       title = "Number of Siblings For All Groups") +
+  coord_flip() +
+  facet_wrap(~cat_group, scales = "free", ncol = 3) +
+  theme_minimal()+
+  theme(legend.position = "none") 
+```
+
+```{r, echo=FALSE}
+aov_res <- lapply(cat_columns, function(category){
+  res = aov(nr_siblings ~ get(category), 
+                    data = score_df) |> 
+    broom::tidy() |> 
+    mutate(term = case_when(
+      term == "get(category)" ~ category, 
+      TRUE ~ term)) |> 
+    slice(1) |> 
+    dplyr::select(term, df, statistic, `p.value`)
+  return(res)
+})
+
+aov_res <- bind_rows(aov_res) 
+
+aov_res |> 
+  filter(`p.value` < 0.05) |> 
+  mutate(`p.value` = signif(`p.value`, 3), 
+         statistic = round(statistic, digits = 3)) |> 
+  knitr::kable(caption = "ANOVA: Number of Siblings v/s Other Covariates (<0.05)")
+```
+
+To model for math, reading and writing scores of students, we utilized forward selection and step-wise regression, along with test based procedures and LASSO to find the "best fitting" models. Among the shortlisted models, we ran 10-fold cross validation to finalize on the better performing model. 
+
+### Math Score Prediction
+With forward selection, we obtained seven significant predictors. Subsequently,we visualized math score between pairs of categorical variables. Among the pairs where the mean values score are associated within sub-categories, we tested for interaction, and found that weekly study hours and parental marital status has significant combined effect. 
+```{r, echo=FALSE}
+math_score_df <- score_df |> 
+  select(-c(reading_score, writing_score))
+covars <- names(math_score_df)[names(math_score_df) != "math_score"]
+individual_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars))
+})
+
+individual_fits <- Reduce(rbind, individual_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter first the one with the lowest p-value: `lunch_typefree/reduced`
+forward1 = lm(`math_score` ~ `lunch_type`, data = math_score_df)
+#summary(forward1)
+
+### Step 2: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type")]
+step2_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward1", vars, sep = "+"))
+})
+
+step2_fits <- Reduce(rbind, step2_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `test_prep`
+forward2 = update(forward1, . ~ . + test_prep)
+#summary(forward2)
+
+### Step 3: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type", "test_prep")]
+step3_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + test_prep + get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward2", vars, sep = "+"))
+})
+
+step3_fits <- Reduce(rbind, step3_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `gender`
+forward3 = update(forward2, . ~ . + gender)
+#summary(forward3)
+
+
+### Step 4: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type", "test_prep",
+                                                            "gender")]
+step4_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + test_prep + gender + get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward3", vars, sep = "+"))
+})
+
+step4_fits <- Reduce(rbind, step4_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+# Enter the one with the lowest p-value: `ethnic_group` (specifically group E)
+forward4 = update(forward3, . ~ . + ethnic_group)
+#summary(forward4)
+
+### Step 5: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type", "test_prep",
+                                                            "gender", "ethnic_group")]
+step5_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + test_prep + gender + ethnic_group + 
+              get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward4", vars, sep = "+"))
+})
+
+step5_fits <- Reduce(rbind, step5_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+# Enter the one with the lowest p-value: `parent_educ`
+forward5 = update(forward4, . ~ . + parent_educ)
+#summary(forward5)
+
+### Step 6: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type", "test_prep",
+                                                            "gender", "ethnic_group", "parent_educ")]
+step6_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + test_prep + gender + ethnic_group + 
+              parent_educ + get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward5", vars, sep = "+"))
+})
+
+step6_fits <- Reduce(rbind, step6_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+# Enter the one with the lowest p-value: `parent_marital_status`
+forward6 = update(forward5, . ~ . + parent_marital_status)
+#summary(forward6)
+
+### Step 7: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type", "test_prep",
+                                                            "gender", "ethnic_group", "parent_educ", 
+                                                            "parent_marital_status")]
+step7_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + test_prep + gender + ethnic_group + 
+              parent_educ + parent_marital_status + get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward6", vars, sep = "+"))
+})
+
+step7_fits <- Reduce(rbind, step7_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+
+# Enter the one with the lowest p-value: `wkly_study_hours`
+forward7 = update(forward6, . ~ . + wkly_study_hours)
+#summary(forward7)
+
+### Step 8: Enter the one with the lowest p-value in the rest 
+covars <- names(math_score_df)[!names(math_score_df) %in% c("math_score", "lunch_type", "test_prep",
+                                                            "gender", "ethnic_group", "parent_educ", 
+                                                            "parent_marital_status", "wkly_study_hours")]
+step8_fits <- lapply(covars, function(vars){
+  fit1 = lm(`math_score` ~ lunch_type + test_prep + gender + ethnic_group + 
+              parent_educ + parent_marital_status + wkly_study_hours + get(vars), data = math_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward7", vars, sep = "+"))
+})
+
+step8_fits <- Reduce(rbind, step8_fits) |> 
+  filter(term != "(Intercept)") 
+
+# P-value of all new added variables are larger than 0.05, so we stop here.
+
+## we can look at interaction terms between interested terms:
+## interaction between chosen covariates (need to correct this)
+step8_fits_w_interactions <- lm(`math_score` ~ lunch_type*test_prep*gender*ethnic_group*parent_educ*parent_marital_status*wkly_study_hours, 
+                                data = math_score_df) 
+
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 3, fig.height = 2, out.width = "95%", dpi = 600}
+covars <- c("lunch_type", "test_prep", "gender", "ethnic_group", 
+            "parent_educ", "parent_marital_status","wkly_study_hours")
+
+list1 <- list()
+for (index in 1:(length(covars)-1)) {
+  for(i in (index+1): length(covars)) {
+    subset_df <- math_score_df |> 
+      drop_na(rlang::sym(covars[index]), rlang::sym(covars[i]))
+    p <- ggline(subset_df, # remove NA level for color group
+                   x = covars[index], 
+                   y = "math_score", color = covars[i],
+                   add = c("mean")) +
+      labs(y = "Math Score", title = "Interaction between Parents' Marital Status and Weekly Study Hours") +
+      theme(text = element_text(size = 5), 
+            legend.position = "right", 
+            panel.spacing.x=unit(0, "lines"),
+            panel.spacing.y=unit(0, "lines"))
+    names <- paste(covars[index], covars[i], sep = ":")
+    list1[[names]] <- p
+  }
+}
+list1$`parent_marital_status:wkly_study_hours`
+##potential association between covariates in relation to their math score.
+forward8 = update(forward7, . ~ . + parent_marital_status*wkly_study_hours) 
+#summary(forward8)
+
+mult.forward.final = forward8
+#summary(mult.forward.final)
+```
+
+The diagnostic plots and test (included in corresponding R code) suggests that the model follows homoscedasticity, mean of 0 for residuals, and there are no outliers or any influential points. However, there is slight deviation from normality (as shown by the formal test below). 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 7, fig.height = 5, out.width = "95%", dpi = 600}
+par(mfrow = c(2,2))
+plot(mult.forward.final)
+mtext("Model from Forward Selection", side = 3, line = - 2, outer = TRUE)
+
+mult.forward.final <- lm(formula = math_score +1 ~ lunch_type + test_prep + gender + ethnic_group + 
+                             parent_educ + parent_marital_status + wkly_study_hours + 
+                             parent_marital_status:wkly_study_hours, data = math_score_df)
+### removing the influential point if needed
+cooksd <- cooks.distance(mult.forward.final)
+influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+```
+
+```{r, echo=FALSE}
+shapiro.test(resid(mult.forward.final)) |> 
+  broom::tidy() |> 
+  knitr::kable()
+```
+We ran boxcox transformation to find the optimal transformation needed for residual for math score to follow the assumptions. 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 4, fig.height = 3, out.width = "95%", dpi = 600}
+par(mfrow = c(1,1))
+boxcox <- MASS::boxcox(mult.forward.final, 
+             lambda = seq(-2.5, 2.5, 1/10)) 
+
+boxcox <- Reduce(cbind, boxcox)
+optimal_power <- boxcox |> 
+  as_tibble() |> 
+  filter(V2 == max(V2)) |> 
+  pull(init) |> 
+  round(digits =2)
+
+### removing the influential point if needed
+cooksd <- cooks.distance(mult.forward.final)
+influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+```
+Upon transformation of $(Math\ Score + 1)^{1.3}$, the residuals follow the normality (Shapiro-Wilk test, p-value = 0.055), homoscedascity and mean 0 assumptions. 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 7, fig.height = 5, out.width = "95%", dpi = 600}
+## transform math score 
+math_score_df <- math_score_df |> 
+  mutate(transformed_math = (math_score +1)^1.3) 
+
+mult.forward.final <- lm(formula = transformed_math ~ lunch_type + test_prep + gender + ethnic_group + 
+                             parent_educ + parent_marital_status*wkly_study_hours, data = math_score_df)
+
+par(mfrow = c(2,2))
+plot(mult.forward.final)
+mtext("Model from Forward Selection: After Transformation", side = 3, line = - 2, outer = TRUE)
+
+shapiro.test(resid(mult.forward.final)) |> 
+  broom::tidy() |> 
+  knitr::kable()
+
+```
+The final model is as below: \
+```{r, echo = FALSE}
+mult.forward.final |> 
+  broom::tidy() |> 
+  mutate_at(.vars = vars(`p.value`), signif, 3) |> 
+  mutate_at(.vars = vars(`estimate`:`statistic`), round, 2) |> 
+  knitr::kable(digits = 50, 
+               caption = "Forward Selection: Coefficients")
+
+mult.forward.final |> 
+  broom::glance() |> 
+  mutate_at(.vars = vars(`r.squared`:`p.value`), signif, 2) |> 
+  mutate_at(.vars = vars(`AIC`:`BIC`), round, 0) |> 
+  knitr::kable(digits = 50, 
+               caption = "Forward Selection: Model Summary")
+```
+Next, we applied step-wise regression method to select a model. The initial model had five covariates (weekly study hours, test preparation, lunch type, gender and ethnic group) that can potentially be related to academic performance. New covariates were added, insignificant covariates were dropped in the following steps to obtain a model with all significant predictors. Both forward and Stepwise regression gives us the same model. 
+```{r, echo=FALSE}
+
+math_model1 <- lm(transformed_math ~ gender + wkly_study_hours + 
+                    test_prep + ethnic_group + lunch_type, data = math_score_df) 
+
+### do gender and wkly study hour/test_prep/ethnic_group have combined effect?
+math_model2v1 <- lm(transformed_math ~ gender*wkly_study_hours + 
+                      gender*test_prep + gender*ethnic_group + gender*lunch_type, data = math_score_df)
+#summary(math_model2v1)
+
+### no significant interaction effect and adjusted R^2 decreasing so, not choosing these interactions
+
+### how about interaction of test prep with weekly study hours and ethnic_group
+math_model2v2 <- lm(transformed_math ~ gender + 
+                      wkly_study_hours*test_prep*ethnic_group*lunch_type, 
+                    data = math_score_df)
+#summary(math_model2v2)
+
+### no significant interaction effect and adjusted R^2 decreasing so, not choosing these interactions
+
+math_model2v3 <- lm(transformed_math ~ gender + wkly_study_hours + 
+                      test_prep + ethnic_group + lunch_type + 
+                      parent_educ, data = math_score_df)
+#summary(math_model2v3)
+
+math_model2 <- lm(transformed_math ~ gender + wkly_study_hours + 
+                    test_prep + ethnic_group + lunch_type + 
+                    parent_educ, data = math_score_df) 
+#summary(math_model2)
+
+### adding parents education improved adjusted R and it is signficant
+
+### testing parent's education's interaction with others
+math_model3v1 <- lm(transformed_math ~ gender*parent_educ + 
+                      wkly_study_hours*parent_educ + test_prep*parent_educ + 
+                      ethnic_group*parent_educ, data = math_score_df)
+#summary(math_model3v1)
+
+### no significant interaction effect and adjusted R^2 decreased so, not choosing this
+
+### adding interactions for parental marital status
+math_model3v2 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status + 
+                      test_prep*parent_marital_status + ethnic_group*parent_marital_status + 
+                      lunch_type*parent_marital_status + parent_educ*parent_marital_status, 
+                    data = math_score_df)
+#summary(math_model3v2)
+
+### adding sports practice status (only keep significant interactions)
+math_model3v3 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status + 
+                      test_prep + ethnic_group + lunch_type + practice_sport, 
+                    data = math_score_df)
+#summary(math_model3v3)
+
+###removing practice_sports not significant
+
+math_model3 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status +
+                    test_prep + ethnic_group + lunch_type+ parent_educ, 
+                  data = math_score_df)
+
+#par(mfrow = c(2,2))
+#plot(math_model3)
+
+### removing the influential point if needed
+cooksd <- cooks.distance(math_model3)
+influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+
+### adding transport means
+math_model4v1 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status + 
+                      test_prep + ethnic_group + lunch_type + parent_educ + 
+                      transport_means, data = math_score_df)
+#summary(math_model4v1)
+
+### transportation was not important so going back
+
+### adding is_first_child
+math_model4v2 <- lm(transformed_math ~ gender + wkly_study_hours*parent_marital_status + 
+                      test_prep + ethnic_group + lunch_type + 
+                      parent_educ + is_first_child, data = math_score_df)
+#summary(math_model4v2)
+
+###both model4 versions not significant so, model 3 is the final version. 
+
+mult.fit.stepwise = math_model3
+#summary(mult.fit.stepwise)
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 6, fig.height = 3, out.width = "95%", dpi = 600}
+unselect_math_score_df <- math_score_df |> 
+  select(-math_score)
+
+mat = as.matrix(math_score_df)
+# Printing the 2 best models of each size, using the Cp criterion:
+#leaps(x = mat[,c(1:2, 4:8)], y = mat[,3], nbest = 2, method = "Cp")
+
+# Printing the 2 best models of each size, using the adjusted R^2 criterion:
+#leaps(x = mat[,c(1:2, 4:8)], y = mat[,3], nbest = 2, method = "adjr2")
+
+# Function regsubsets() performs a subset selection by identifying the "best" model that contains
+# a certain number of predictors. By default "best" is chosen using SSE/RSS (smaller is better)
+b = regsubsets(`transformed_math` ~ . , data = unselect_math_score_df, 
+               nvmax = 23)
+rs = summary(b)
+
+# plot of Cp and Adj-R2 as functions of parameters
+par(mfrow=c(1,2))
+
+plot(2:23, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+abline(0,1)
+
+plot(2:23, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+```
+The models were further investigated using test based criteria. Based on the Mallow’s Cp and adjusted $R^2$, an optimal model for math score will should 15-17 main effect parameters. This aligns with our model selected from forward and backward model selection. LASSO suggests taking number of siblings into account. So, we decided to cross-validate and compare performances between model with and without number of sibling as a modifier. 
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 4, fig.height = 4, out.width = "95%", dpi = 600}
+math_score_subdf <- math_score_df |> 
+  drop_na()
+# fit a LASSO with lambda = 5
+fit_5 <- glmnet(as.matrix(math_score_subdf[1:11]), math_score_subdf$math_score, lambda = 5)
+#coef(fit_5)
+
+# fit a LASSO with lambda = 1
+fit_1 <- glmnet(as.matrix(math_score_subdf[1:11]), math_score_subdf$math_score, lambda = 1)
+#coef(fit_1)
+
+# fit a LASSO with lambda = 0.1
+fit_0.1 <- glmnet(as.matrix(math_score_subdf[1:11]), math_score_subdf$math_score, lambda = 0.1)
+#coef(fit_0.1)
+
+# using cross validation to choose lambda
+lambda_seq <- 10^seq(-3, 0, by = .1)
+set.seed(2)
+cv_object <- cv.glmnet(as.matrix(math_score_subdf[1:11]), math_score_subdf$math_score, 
+                       lambda = lambda_seq, 
+                       nfolds = 5)
+#cv_object 
+
+# plot the CV results
+#tibble(lambda = cv_object$lambda,
+#       mean_cv_error = cv_object$cvm) %>%
+#  ggplot(aes(x = lambda, y = mean_cv_error)) +
+#  geom_point()
+
+# extracting the exact minimum lambda from the CV object
+#cv_object$lambda.min
+
+
+# ftiiting the lasso model with the "best" lambda
+fit_bestcv <- glmnet(as.matrix(math_score_subdf[1:11]), math_score_subdf$math_score, lambda = cv_object$lambda.min) 
+#coef(fit_bestcv)
+
+```
+
+```{r table5, echo=FALSE}
+fit_bestcv |> 
+  broom::tidy() |> 
+  mutate_if(is.numeric, round, 3) |> 
+  knitr::kable()
+
+mult.lasso.final <- update(mult.forward.final, . ~ . + nr_siblings) 
+```
+
+```{r, echo=FALSE}
+### 10-fold cross validation
+set.seed(1)
+# Use 10-fold validation and create the training sets
+train = trainControl(method = "cv", number = 10)
+
+filtered_df <- math_score_df |> 
+  drop_na(math_score, transformed_math, lunch_type, test_prep, gender, nr_siblings,
+          ethnic_group, parent_educ, parent_marital_status, wkly_study_hours)
+
+# Fit the 4-variables model that we discussed in previous lectures
+model1 = train(transformed_math ~ lunch_type + test_prep + gender + 
+    ethnic_group + parent_educ + parent_marital_status * wkly_study_hours, 
+    data = filtered_df,
+    trControl = train,
+    method = 'lm', na.action = na.pass)
+
+
+# Fit the 5-variables model that we discussed in previous lectures
+model2 = train(transformed_math ~ lunch_type + test_prep + gender + 
+    ethnic_group + parent_educ + parent_marital_status * wkly_study_hours + nr_siblings, 
+    data = filtered_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 9, fig.height = 3, out.width = "95%", dpi = 600}
+# get fold subsets
+fold_data_model1 <- lapply(model1$control$index, function(index) math_score_df[index,]) |> 
+    bind_rows(.id = "Fold") |> 
+  mutate(math_score = transformed_math^(1/1.3) -1)
+fold_data_model2 <- lapply(model2$control$index, function(index) math_score_df[index,]) |> 
+    bind_rows(.id = "Fold") |> 
+  mutate(math_score = transformed_math^(1/1.3) -1)
+
+
+# example plots
+plot1 <- ggplot(fold_data_model1, aes(math_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model w/o Number of Siblings")
+plot2 <- ggplot(fold_data_model2, aes(math_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model w/ Number of Siblings")
+#ggarrange(plot1, plot2, ncol = 2, common.legend = TRUE, 
+#          legend = "right")
+
+```
+Among the two, the model without number of sibling has lower root mean square error, higher $R^2$ has similar predictive ability as the more complex model. Therefore, it is the better fitting model. 
+```{r, echo = FALSE}
+bind_rows(model1[["results"]], 
+          model2[["results"]]) |> 
+  mutate(model_id = c("w/o no. of sibling", "w/ no. of sibling")) |> 
+  select(c(model_id, `RMSE`:`MAESD`)) |> 
+  knitr::kable(digits =3, caption = "Performance matrices of the 2 Models in Predicting (Math Score + 1)^1.3")
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 3, out.width = "95%", dpi = 600}
+filtered_df |> 
+  mutate(math_model1_pred = (model1[["finalModel"]][["fitted.values"]])^(1/1.3) - 1, 
+         math_model2_pred = (model2[["finalModel"]][["fitted.values"]])^(1/1.3) - 1) |> 
+  pivot_longer(
+    cols = c(math_model1_pred, math_model2_pred), 
+    names_to = "model_type", 
+    values_to = "res"
+  ) |> 
+  ggplot(aes(x = res, y = math_score)) +
+  geom_abline(intercept = 0, slope = 1, color = "#f7aa58") +
+  geom_point(size = 1, shape = 21) +
+  labs(x = "Predicted Score", y = "Actual Score", 
+       title = "Correlation of Observed and Predicted Math Score") +
+  facet_wrap(~model_type, scale = "free") +
+  stat_cor(label.y = 5) +
+  scale_x_discrete(labels = c("Predicted Math Score"))
+```
+
+### Writing Score Prediction
+```{r, echo=FALSE}
+writing_score_df <- score_df |> 
+  select(-c(reading_score, math_score))
+covars <- names(writing_score_df)[names(writing_score_df) != "writing_score"]
+individual_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars))
+})
+
+individual_fits <- Reduce(rbind, individual_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter first the one with the lowest p-value: `test_prep`
+forward1 = lm(`writing_score` ~ `test_prep`, data = writing_score_df)
+#summary(forward1)
+
+### Step 2: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "test_prep")]
+step2_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ test_prep + get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward1", vars, sep = "+"))
+})
+
+step2_fits <- Reduce(rbind, step2_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `gender`
+forward2 = update(forward1, . ~ . + gender)
+#summary(forward2)
+
+### Step 3: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "gender", "test_prep")]
+step3_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~  test_prep + gender + get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward2", vars, sep = "+"))
+})
+
+step3_fits <- Reduce(rbind, step3_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `lunch_type`
+forward3 = update(forward2, . ~ . + lunch_type)
+#summary(forward3)
+
+
+### Step 4: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "gender", "test_prep", 
+                                                                  "lunch_type")]
+step4_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ test_prep + gender + lunch_type + get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward3", vars, sep = "+"))
+})
+
+step4_fits <- Reduce(rbind, step4_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+# Enter the one with the lowest p-value: `parent_educ`
+forward4 = update(forward3, . ~ . + parent_educ)
+#summary(forward4)
+
+### Step 5: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "gender", "test_prep", 
+                                                                  "lunch_type", "parent_educ")]
+step5_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ test_prep + gender + lunch_type + 
+              parent_educ + get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward4", vars, sep = "+"))
+})
+
+step5_fits <- Reduce(rbind, step5_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+# Enter the one with the lowest p-value: `ethnic_group`
+forward5 = update(forward4, . ~ . + ethnic_group)
+#summary(forward5)
+
+### Step 6: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "gender", "test_prep", 
+                                                                  "lunch_type", "parent_educ", "ethnic_group")]
+step6_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ test_prep + gender + lunch_type + 
+              parent_educ + ethnic_group + get(vars), 
+            data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward5", vars, sep = "+"))
+})
+
+step6_fits <- Reduce(rbind, step6_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+# Enter the one with the lowest p-value: `parent_marital_status`
+forward6 = update(forward5, . ~ . + parent_marital_status)
+#summary(forward6)
+
+### Step 7: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "gender", "test_prep", 
+                                                                  "lunch_type", "parent_educ", "ethnic_group", 
+                                                            "parent_marital_status")]
+step7_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ test_prep + gender + lunch_type + 
+              parent_educ + ethnic_group + parent_marital_status + get(vars), 
+            data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward6", vars, sep = "+"))
+})
+
+step7_fits <- Reduce(rbind, step7_fits) |> 
+  filter(term != "(Intercept)") 
+
+
+
+# Enter the one with the lowest p-value: `practice_sport`
+forward7 = update(forward6, . ~ . + practice_sport)
+#summary(forward7)
+
+### Step 8: Enter the one with the lowest p-value in the rest 
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("writing_score", "gender", "test_prep", 
+                                                                  "lunch_type", "parent_educ", "ethnic_group", 
+                                                            "parent_marital_status", "practice_sport")]
+step8_fits <- lapply(covars, function(vars){
+  fit1 = lm(`writing_score` ~ test_prep + gender + lunch_type + parent_educ + 
+              ethnic_group + parent_marital_status + practice_sport + get(vars), 
+            data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward7", vars, sep = "+"))
+})
+
+step8_fits <- Reduce(rbind, step8_fits) |> 
+  filter(term != "(Intercept)") 
+
+# P-value of all new added variables are larger than 0.05, so we stop here.
+
+## we can look at interaction terms between interested terms:
+```
+Using forward selection, we obtained seven significant covariates to predict writing score, namely test preparation, gender, lunch type, parent education, ethnic group, parent marital status and sports practice status. We visualized writing score between pairs of categorical variables. Among the pairs where the mean values score are associated within sub-categories, we tested for interaction, and found that signigicant interaction coefficient for `gender:wkly_study_hours` and `lunch_type:wkly_study_hours`. Similarly, we the same model was selected for upon step-wise regression selection. 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 2, out.width = "95%", dpi = 600}
+covars <- c("gender", "test_prep", 
+            "lunch_type", "parent_educ", "ethnic_group", 
+            "parent_marital_status", "practice_sport", "wkly_study_hours")
+
+list1 <- list()
+for (index in 1:(length(covars)-1)) {
+  for(i in (index+1): length(covars)) {
+    subset_df <- writing_score_df |> 
+      drop_na(rlang::sym(covars[index]), rlang::sym(covars[i]))
+    p <- ggline(subset_df, # remove NA level for color group
+                   x = covars[index], 
+                   y = "writing_score", color = covars[i],
+                   add = c("mean")) +
+      labs(y = "Writing Score", title = "") +
+      theme(text = element_text(size = 5), 
+            legend.position = "right", 
+            panel.spacing.x=unit(0, "lines"),
+            panel.spacing.y=unit(0, "lines"))
+    names <- paste(covars[index], covars[i], sep = ":")
+    list1[[names]] <- p
+  }
+}
+ggarrange(list1$`gender:wkly_study_hours`, 
+          list1$`lunch_type:practice_sport`, 
+          list1$`lunch_type:wkly_study_hours`, ncol = 3, 
+          legend = "right") +
+  ggtitle("Interaction Between Categorical Values")
+##potential association between covariates in relation to their math score (adding significant interactions only)
+forward8 = update(forward7, . ~ . + gender*wkly_study_hours) 
+#summary(forward8)
+
+forward9 = update(forward8, . ~ . + lunch_type*wkly_study_hours) 
+#summary(forward9)
+
+mult.forward.final = forward9
+#summary(mult.forward.final)
+```
+Similar to math model, the residuals were followed homoscedascticity, mean zero assumptions, but deviated from normality assumptions. Therefore, box-cox transformation was used to identify the optimal transformation, and model was re-fitted using $\sqrt(Writing\ Score)^3$. 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 7, fig.height = 5, out.width = "95%", dpi = 600}
+par(mfrow = c(2,2))
+plot(mult.forward.final)
+mtext("Wrtiting Score: Model from Forward Selection", side = 3, line = - 2, outer = TRUE)
+
+mult.forward.final <- lm(formula =writing_score ~ test_prep + gender + lunch_type + 
+    parent_educ + ethnic_group + parent_marital_status + practice_sport + 
+    wkly_study_hours + gender:wkly_study_hours +  
+    lunch_type:wkly_study_hours, data = writing_score_df)
+### removing the influential point if needed
+cooksd <- cooks.distance(mult.forward.final)
+influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+
+shapiro.test(resid(mult.forward.final)) |> 
+ broom::tidy() |> 
+ knitr::kable()
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 3, fig.height = 3, out.width = "95%", dpi = 600}
+par(mfrow = c(1,1))
+boxcox <- MASS::boxcox(mult.forward.final, 
+             lambda = seq(-2.5, 2.5, 1/10)) 
+
+boxcox <- Reduce(cbind, boxcox)
+optimal_power <- boxcox |> 
+  as_tibble() |> 
+  filter(V2 == max(V2)) |> 
+  pull(init) |> 
+  round(digits =2)
+
+### removing the influential point if needed
+cooksd <- cooks.distance(mult.forward.final)
+influential <- as.numeric(names(cooksd)[(cooksd > 0.5)])
+```
+Upon transformation of $\sqrt(Writing\ Score)^3$, the normality, homoscedascity and mean 0 assumptions for residuals are met. 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 7, fig.height = 5, out.width = "95%", dpi = 600}
+## transform math score 
+writing_score_df <- writing_score_df |> 
+  mutate(transformed_writing = (writing_score)^1.5) 
+
+mult.forward.final <- lm(formula =transformed_writing ~ test_prep + gender + lunch_type + 
+    parent_educ + ethnic_group + parent_marital_status + practice_sport + 
+    wkly_study_hours + gender:wkly_study_hours +  
+    lunch_type:wkly_study_hours, data = writing_score_df)
+
+par(mfrow = c(2,2))
+plot(mult.forward.final)
+mtext("Model from Forward Selection: After Transformation", side = 3, line = - 2, outer = TRUE)
+```
+The final model for writing score is: 
+```{r, echo = FALSE}
+mult.forward.final |> 
+  broom::tidy() |> 
+  mutate_at(.vars = vars(`p.value`), signif, 3) |> 
+  mutate_at(.vars = vars(`estimate`:`statistic`), round, 2) |> 
+  knitr::kable(digits = 50, 
+               caption = "Forward Selection: Coefficients")
+mult.forward.final |> 
+  broom::glance() |> 
+  mutate_at(.vars = vars(`r.squared`:`p.value`), signif, 2) |> 
+  mutate_at(.vars = vars(`AIC`:`BIC`), round, 0) |> 
+  knitr::kable(digits = 50, 
+               caption = "Forward Selection: Model Summary")
+```
+We applied step-wise regression method to select a model with the same initial five covariates as used for prediction model for math. New covariates were added, insignificant covariates were dropped in the following steps to obtain a model with all significant predictors. Both forward and Stepwise regression gives us the same model. 
+```{r, echo=FALSE}
+writing_model1 <- lm(transformed_writing ~ gender*wkly_study_hours + 
+                    test_prep + ethnic_group + lunch_type, data = writing_score_df) 
+
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("transformed_writing", "writing_score", "gender", "wkly_study_hours",
+                                                            "test_prep", "ethnic_group", "lunch_type")]
+
+step1_fits <- lapply(covars, function(vars){
+  fit1 = lm(transformed_writing ~ gender*wkly_study_hours + 
+              test_prep + ethnic_group + lunch_type + 
+              get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward1", vars, sep = "+"))
+})
+
+step1_fits <- Reduce(rbind, step1_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `parent_educ`
+stepwise2 = update(writing_model1, . ~ . + parent_educ)
+#summary(stepwise2)
+
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("transformed_writing", "writing_score", "gender", "wkly_study_hours",
+                                                            "test_prep", "ethnic_group", "lunch_type", "parent_educ")]
+
+step2_fits <- lapply(covars, function(vars){
+  fit1 = lm(transformed_writing ~ gender*wkly_study_hours + 
+              test_prep + ethnic_group + lunch_type + parent_educ + 
+              get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward2", vars, sep = "+"))
+})
+
+step2_fits <- Reduce(rbind, step2_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `parent_marital_status`
+stepwise3 = update(stepwise2, . ~ . + parent_marital_status)
+#summary(stepwise3)
+
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("transformed_writing", "writing_score", "gender", "wkly_study_hours",
+                                                            "test_prep", "ethnic_group", "lunch_type", "parent_educ", 
+                                                            "parent_marital_status")]
+
+step3_fits <- lapply(covars, function(vars){
+  fit1 = lm(transformed_writing ~ gender*wkly_study_hours + 
+              test_prep + ethnic_group + lunch_type + parent_educ + 
+              parent_marital_status + get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward3", vars, sep = "+"))
+})
+
+step3_fits <- Reduce(rbind, step3_fits) |> 
+  filter(term != "(Intercept)") 
+
+# Enter the one with the lowest p-value: `practice_sport`
+stepwise4 = update(stepwise3, . ~ . + practice_sport)
+#summary(stepwise4)
+
+covars <- names(writing_score_df)[!names(writing_score_df) %in% c("transformed_writing", "writing_score", "gender", "wkly_study_hours",
+                                                            "test_prep", "ethnic_group", "lunch_type", "parent_educ", 
+                                                            "parent_marital_status", "practice_sport")]
+
+step4_fits <- lapply(covars, function(vars){
+  fit1 = lm(transformed_writing ~ gender*wkly_study_hours + 
+              test_prep + ethnic_group + lunch_type + parent_educ + 
+              parent_marital_status + practice_sport + get(vars), data = writing_score_df) |> 
+  broom::tidy() |> 
+    mutate(term = str_replace(term, "get[(]vars[])]", vars), 
+           group = paste("forward4", vars, sep = "+"))
+})
+
+### no significant coefficients 
+
+###adding significant interactions as identified in forward selection
+stepwise5 = update(stepwise4, . ~ . + lunch_type*wkly_study_hours) 
+#summary(stepwise5)
+
+mult.stepwise.final <- stepwise5
+#summary(mult.stepwise.final)
+```
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 6, fig.height = 3, out.width = "95%", dpi = 600}
+unselect_writing_score_df <- writing_score_df |> 
+  select(-writing_score)
+
+mat = as.matrix(writing_score_df)
+# Printing the 2 best models of each size, using the Cp criterion:
+#leaps(x = mat[,c(1:2, 4:8)], y = mat[,3], nbest = 2, method = "Cp")
+
+# Printing the 2 best models of each size, using the adjusted R^2 criterion:
+#leaps(x = mat[,c(1:2, 4:8)], y = mat[,3], nbest = 2, method = "adjr2")
+
+# Function regsubsets() performs a subset selection by identifying the "best" model that contains
+# a certain number of predictors. By default "best" is chosen using SSE/RSS (smaller is better)
+b = regsubsets(`transformed_writing` ~ . , data = unselect_writing_score_df, 
+               nvmax = 30)
+rs = summary(b)
+
+# plot of Cp and Adj-R2 as functions of parameters
+par(mfrow=c(1,2))
+
+plot(2:23, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+abline(0,1)
+
+plot(2:23, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+```
+The models were further investigated using test based criteria. Based on the Mallow’s Cp and adjusted $R^2$, an optimal model for math score will should 13-18 main effect parameters. This aligns with our model selected from forward and backward model selection. LASSO suggests taking number of siblings into account. So, we decided to cross-validate and compare performances between model with and without number of sibling as a modifier. 
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 4, fig.height = 4, out.width = "95%", dpi = 600}
+writing_score_subdf <- writing_score_df |> 
+  drop_na()
+# fit a LASSO with lambda = 5
+fit_5 <- glmnet(as.matrix(writing_score_subdf[1:11]), writing_score_subdf$transformed_writing, lambda = 5)
+#coef(fit_5)
+
+# fit a LASSO with lambda = 1
+fit_1 <- glmnet(as.matrix(writing_score_subdf[1:11]), writing_score_subdf$transformed_writing, lambda = 1)
+#coef(fit_1)
+
+# fit a LASSO with lambda = 0.1
+fit_0.1 <- glmnet(as.matrix(writing_score_subdf[1:11]), writing_score_subdf$transformed_writing, lambda = 0.1)
+#coef(fit_0.1)
+
+# using cross validation to choose lambda
+lambda_seq <- 10^seq(-3, 0, by = .1)
+set.seed(2)
+cv_object <- cv.glmnet(as.matrix(writing_score_subdf[1:11]), writing_score_subdf$transformed_writing, 
+                       lambda = lambda_seq, 
+                       nfolds = 5)
+#cv_object 
+
+# plot the CV results
+#tibble(lambda = cv_object$lambda,
+#       mean_cv_error = cv_object$cvm) %>%
+#  ggplot(aes(x = lambda, y = mean_cv_error)) +
+#  geom_point()
+
+# extracting the exact minimum lambda from the CV object
+#cv_object$lambda.min
+
+
+# ftiiting the lasso model with the "best" lambda
+fit_bestcv <- glmnet(as.matrix(writing_score_subdf[1:11]), writing_score_subdf$transformed_writing, lambda = cv_object$lambda.min) 
+#coef(fit_bestcv)
+
+```
+
+```{r, echo=FALSE}
+fit_bestcv |> 
+  broom::tidy() |> 
+  mutate_if(is.numeric, round, 3) |> 
+  knitr::kable()
+
+mult.lasso.final <- update(mult.forward.final, . ~ . + nr_siblings) 
+```
+
+```{r, echo=FALSE}
+### 10-fold cross validation
+set.seed(1)
+# Use 10-fold validation and create the training sets
+train = trainControl(method = "cv", number = 10)
+
+filtered_df <- writing_score_df |> 
+  drop_na(writing_score, transformed_writing, gender, wkly_study_hours, 
+    test_prep, ethnic_group, lunch_type, parent_educ, parent_marital_status, 
+    practice_sport, nr_siblings)
+
+# Fit 1st model that we discussed in previous lectures
+model1 = train(transformed_writing ~ gender + wkly_study_hours + 
+    test_prep + ethnic_group + lunch_type + parent_educ + parent_marital_status + 
+    practice_sport + gender:wkly_study_hours + wkly_study_hours:lunch_type, 
+    data = filtered_df,
+    trControl = train,
+    method = 'lm', na.action = na.pass)
+
+
+# Fit 2nd model that we discussed in previous lectures
+model2 = train(transformed_writing ~ gender + wkly_study_hours + 
+    test_prep + ethnic_group + lunch_type + parent_educ + parent_marital_status + 
+    practice_sport + gender:wkly_study_hours + wkly_study_hours:lunch_type + nr_siblings, 
+    data = filtered_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 9, fig.height = 3, out.width = "95%", dpi = 600}
+# get fold subsets
+fold_data_model1 <- lapply(model1$control$index, function(index) writing_score_df[index,]) |> 
+    bind_rows(.id = "Fold") |> 
+  mutate(writing_score = transformed_writing^(1/1.5))
+fold_data_model2 <- lapply(model2$control$index, function(index) writing_score_df[index,]) |> 
+    bind_rows(.id = "Fold") |> 
+  mutate(writing_score = transformed_writing^(1/1.5))
+
+
+# example plots
+plot1 <- ggplot(fold_data_model1, aes(writing_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model w/o Number of Siblings")
+plot2 <- ggplot(fold_data_model2, aes(writing_score, col = Fold)) + geom_density(alpha = 0.6) + ggtitle("Model w/ Number of Siblings")
+#ggarrange(plot1, plot2, ncol = 2, common.legend = TRUE, 
+        #  legend = "right")
+
+```
+Among the two, the model without number of sibling has lower root mean square error, higher $R^2$ has similar predictive ability as the more complex model. Therefore, it is the better fitting model. 
+```{r, echo = FALSE}
+bind_rows(model1[["results"]], 
+          model2[["results"]]) |> 
+  mutate(model_id = c("w/o no. of sibling", "w/ no. of sibling")) |> 
+  select(c(model_id, `RMSE`:`MAESD`)) |> 
+  knitr::kable(digits =3, caption = "Performance matrices of the 2 Models in Predicting (Writing Score)^1.5")
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 3, out.width = "95%", dpi = 600}
+filtered_df |> 
+  mutate(mod_wo_sibling_count = (model1[["finalModel"]][["fitted.values"]])^(1/1.5), 
+         mod_w_sibling_count = (model2[["finalModel"]][["fitted.values"]])^(1/1.5)) |> 
+  pivot_longer(
+    cols = c(mod_wo_sibling_count, mod_w_sibling_count), 
+    names_to = "model_type", 
+    values_to = "res"
+  ) |> 
+  ggplot(aes(x = res, y = writing_score)) +
+  geom_abline(intercept = 0, slope = 1, color = "#f7aa58") +
+  geom_point(size = 1, shape = 21) +
+  labs(x = "Predicted Score", y = "Actual Score", 
+       title = "Correlation of Observed and Predicted Writing Score") +
+  facet_wrap(~model_type, scale = "free") +
+  stat_cor(label.y = 5) +
+  scale_x_discrete(labels = c("Predicted Writing Score"))
+```
+
+
+
