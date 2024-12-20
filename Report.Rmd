@@ -27,18 +27,18 @@ The full dataset includes data from 948 students. We created summary tables to d
 Most variables were missing between 15 to 100 values, spread evenly across the students. Students with missing data were included in all exploratory analysis and visualizations, and were excluded from regression models when necessary. We found a handful of score outliers for each subject, but chose to leave these points in, as they seemed like valid data points (and not errors in data entry). Other minor data cleaning was performed. 
 
 ## Model Development, Diagnostics and Selection
-To begin, we analyzed the covariates to identify those with high correlations. Focusing on the categorical variables, we performed a series of chi-square tests and one-way ANOVA to determine whether the covariates were dependent ([Table 4-5](#tab4_5-section)). The p-values from these tests helped us identify pairs of variables with the weakest associations, allowing us to select five variables that were most independent of each other. These variables formed the basis of our initial linear model for predicting individual scores while using stepwise-regression. Additionally, we utilized forward selection. The missing data were dropped because imputed values for categorical variables may complicate the interpretability of the result and it adds uncertainty that needs to be accounted for.
+We analyzed covariates with high correlation, we performed a series of chi-square tests and one-way ANOVA to determine whether the covariates were dependent ([Table 4-5](#tab4_5-section)). The p-values from these tests helped us identify pairs of variables with the weakest associations, allowing us to select five variables that were most independent of each other. These variables formed the basis of our initial linear model for stepwise-regression model selection. Additionally, we utilized forward selection. The missing data were dropped because imputed values for categorical variables may complicate the interpretability of the result and it adds uncertainty that needs to be accounted for.
 
 ### Math Score Prediction
-With forward selection, we obtained seven significant predictors. Subsequently,we visualized math score between pairs of categorical variables. Among the pairs where the mean values score are associated within sub-categories, we tested for interaction, and found that weekly study hours and parental marital status has significant combined effect ([Fig. 4](#fig4-section)). Upon examining diagnostic plots for the selected model, the residual plot revealed greater variance for lower values as well as deviation from normality in Q-Q plot ([Fig. 5, Table 6](#fig5-section)), suggesting that the data do not align with the model’s assumptions. To address this, we applied a transformation of $(Math\ Score + 1)^{1.3}$, as determined by box-cox, to the math scores variable, improving its compatibility with the model ([Fig. 6-7, Table 7-9](#fig6_7-section)). Step-wise regression also resulted in the same model. 
+With forward selection, we obtained seven significant predictors. Subsequently,we visualized math score between pairs of categorical variables. Among the pairs where the mean values score are associated within sub-categories, we tested for interaction, and found that weekly study hours and parental marital status has significant combined effect ([Fig. 4](#fig4-section)). Upon examining diagnostic plots for the selected model, the residual plot revealed greater variance for lower values as well as deviation from normality in Q-Q plot ([Fig. 5, Table 6](#fig5-section)). To address this, we applied a transformation of $(Math\ Score + 1)^{1.3}$, as determined by box-cox, to the math scores variable, improving its compatibility with the model ([Fig. 6-7, Table 7-9](#fig6_7-section)). Step-wise regression also resulted in the same model. 
 Based on the Mallow’s Cp and adjusted $R^2$, an optimal model for math score is suggested to have 15-17 main effect parameters. This aligns with our model selected from forward and backward model selection. LASSO suggests taking number of siblings into account ([Fig. 8, Table 10](#fig8_tab10-section)). So, we decided to cross-validate and compare performances between model with and without number of sibling as a modifier. 
 
 ### Writing Score Prediction
-Using forward selection, we obtained seven significant covariates to predict writing score, namely test preparation, gender, lunch type, parent education, ethnic group, parent marital status and sports practice status. We visualized writing score between pairs of categorical variables. Among the pairs where the mean values score are associated within sub-categories, we tested for interaction, and found that signigicant interaction coefficient for `gender:wkly_study_hours` and `lunch_type:wkly_study_hours`([Fig. 9, Table 10-11](#fig9-section)). The same end model was selected upon step-wise regression selection. 
-The residuals were followed homoscedascticity, mean zero assumptions, but deviated from normality assumptions. Therefore, box-cox transformation was used to identify the optimal transformation, and model was re-fitted using $\sqrt(Writing\ Score)^3$([Fig. 10-12, Table 13](#fig10_12-section)). The models were further investigated using test based criteria. Based on the Mallow’s Cp and adjusted $R^2$, an optimal model for math score will should 13-18 main effect parameters ([Fig. 13](#fig13_tab13-section)). This aligns with our model selected from forward and step-wise model selection. LASSO suggests taking number of siblings into account ([Table 14](#fig13_tab13-section)). So, we decided to cross-validate and compare performances between model with and without number of sibling as a modifier to predict writing score as well. 
+Using forward selection, we identified eight significant covariates to predict writing score, among which seven were the same as identified for model predicting math score. We applied similar steps to check interactions and uncovered significant interaction coefficient for `gender:wkly_study_hours` and `lunch_type:wkly_study_hours`([Fig. 9, Table 10-11](#fig9-section)). The same end model was selected upon step-wise regression selection. 
+The residuals followed homoscedascticity, mean zero assumptions, but deviated from normality assumptions. Therefore, box-cox transformation was used to identify the optimal transformation, and model was re-fitted using $\sqrt(Writing\ Score)^3$([Fig. 10-12, Table 13](#fig10_12-section)). The models were further investigated using test based criteria. Based on the Mallow’s Cp and adjusted $R^2$, an optimal model for math score will should 13-18 main effect parameters ([Fig. 13](#fig13_tab13-section)). This aligns with our model selected from forward and step-wise model selection. Like in math score model, LASSO suggests taking number of siblings into account ([Table 14](#fig13_tab13-section)), so, we decided to cross-validate and compare performances between model with and without number of sibling as a modifier to predict writing score as well. 
 
 ### Reading Score Prediction
-We implemented step-wise regression to deduce significant covariates for modeling `reading score`. We note that most of the variables listed are categorical as mentioned prior. Therefore, we incorporated factor reveling in order to give some dimensions. First, we checked for non-linearity in the `reading_score` and apply transformation if need be. As seen above the after Y transformation where $Y^*= ({reading\_score + 1})^{1.44}$, the residuals follow normality, homoscedascity and mean zero looking at the diagnostic plots ([Fig. 14-15, Table 15-17](#fig14_tab15-section)). Next, we produced two additional models by incorporating additional covariates and testing for potential interactions. Three models were selected for cross-validation ([Fig. 16-17, Table 18-19](#fig16_17_tab18_19-section)). 
+We implemented step-wise regression to deduce significant covariates for modeling `reading score` as both stepwise and forward selection had led to the same model in the previous two models. We note that most of the variables listed are categorical as mentioned prior. Therefore, we incorporated factor reveling in order to give some dimensions. First, we checked for non-linearity in the `reading_score` and apply transformation if need be. As seen above the after Y transformation where $Y^*= ({reading\_score + 1})^{1.4}$, the residuals follow normality, homoscedascity and mean zero looking at the diagnostic plots ([Fig. 14-15, Table 15-17](#fig14_tab15-section)). Next, we produced two additional models by incorporating additional covariates and testing for potential interactions. Three models were selected for cross-validation ([Fig. 16-17, Table 18-19](#fig16_17_tab18_19-section)). 
 
 ## Model Validation
 To evaluate its performance, we conducted 10-fold cross-validation using training datasets, and selected the model based on adjusted $R^2$ and RMSE values as well as the correlation between predicted and observed outcome. 
@@ -49,9 +49,12 @@ The distributions for Math, Reading, and Writing test scores all had similar dis
 
 Among the two models each that were selected for math score and writing score, models with out sibling counts have lower root mean square error, higher $R^2$ has similar predictive ability as the more complex model ([Table 20-21, Fig. 18-19](#fig1819-section)). Similarly, the model 2 (with one interaction term) had the best performance[Fig. 20](#fig20-section)) in predicting the reading score.  
 
-All three scores have the same main effect parameters - weekly study hours, test preparation status, lunch type, parents' education and marital status, ethnic group and gender. However, they differ in the presence of some interaction terms. The combined effect of parents' marital status and weekly study hours is significant in predicting math and reading score, while weekly study hours' combined effect with male student and with lunch type is significantly associated with writing score. 
+In general, female students have better scores in reading and writing where (by nearly 70 points) whereas male students do better in math (by 50 points), after accounting for other social and behaviorial factors like study habits, test prep, etc. Students whose parents have associate degree or higher tend to do better in all three subjects compared to students with parents who have completed some high school. Likewise, parents' marital status is associated too - students who parents are married significantly better than students with single parents. Students belonging to ethnic group D and E are performing better across the subjects compared to students from ethnic group A. Getting reduced/free lunch, which can be a proxy for the financial situation of a student, is associated with poorer test outcome. Writing score's prediction us informed by additional covariate - sport practice. Students who engage in regular sporting activity tend to perform better in the writing portion compared to the student who have never practice sport, after accounting for other covariates. These observations are made after accounting for other variables in the model. 
+
+All three scores have the same seven main effect parameters - weekly study hours, test preparation status, lunch type, parents' education and marital status, ethnic group and gender. However, they differ in the presence of some interaction terms. The combined effect of parents' marital status and weekly study hours is significant in predicting math and reading score, while weekly study hours' combined effect with male student and with lunch type is significantly associated with writing score. 
 
 # Conclusion
+The fact that the score are associated with financial, parental socio-economic status and demographic alludes that the association of the support level and time affored by the student in academics reflects on their test performance.
 
 \pagebreak
 
@@ -451,7 +454,7 @@ step8_fits_w_interactions <- lm(`math_score` ~ lunch_type*test_prep*gender*ethni
 
 ```
 
-```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 4, fig.height = 2, out.width = "95%", dpi = 600}
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 6, fig.height = 2, out.width = "95%", dpi = 600}
 covars <- c("lunch_type", "test_prep", "gender", "ethnic_group", 
             "parent_educ", "parent_marital_status","wkly_study_hours")
 
@@ -865,7 +868,7 @@ step8_fits <- Reduce(rbind, step8_fits) |>
 ```
 
 ## {#fig9-section}
-```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 5, fig.height = 2, out.width = "95%", dpi = 600}
+```{r, echo=FALSE, warning = FALSE, message = FALSE, fig.width = 6, fig.height = 2, out.width = "95%", dpi = 600}
 covars <- c("gender", "test_prep", 
             "lunch_type", "parent_educ", "ethnic_group", 
             "parent_marital_status", "practice_sport", "wkly_study_hours")
@@ -1421,9 +1424,10 @@ filtered_df |>
   ggplot(aes(x = res, y = reading_score)) +
   geom_abline(intercept = 0, slope = 1, color = "#f7aa58") +
   geom_point(size = 1, shape = 21) +
+  labs(x = "Predicted Score", y = "Actual Score", 
+       title = "Figure 20: Correlation of Observed and Predicted Writing Score") +
   facet_wrap(~model_type, scale = "free") +
-  stat_cor(label.y = 5) +
-  scale_x_discrete(labels = c("Figure 20: Predicted and Observed Reading Score"))
+  stat_cor(label.y = 5)
 
 bind_rows(model1$results, model2$results, model3$results) |> 
   mutate(model_id = c(1, 2, 3)) |> 
