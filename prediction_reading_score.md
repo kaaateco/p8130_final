@@ -7,7 +7,8 @@ We implement step-wise regression to deduce significant covariates for
 modeling `reading score`. We note that most of the variables listed are
 categorical as mentioned prior. Therefore, we incorporated factor
 releveing in order to give some dimensions. First, we will check for
-non-linearity in the scores and apply transformation if need be.
+non-linearity in the `reading_score` and apply transformation if need
+be.
 
 ``` r
 # Preliminary using all covariates for the first model
@@ -171,7 +172,7 @@ par(mfrow = c(2,2))
 plot(reading_model1)
 ```
 
-<img src="prediction_reading_score_files/figure-gfm/unnamed-chunk-2-1.png" width="90%" style="display: block; margin: auto;" />
+<img src="prediction_reading_score_files/figure-gfm/Transformation-1.png" width="90%" style="display: block; margin: auto;" />
 
 ``` r
 shapiro.test(rstandard(reading_model1))
@@ -493,7 +494,7 @@ par(mfrow = c(2,2))
 plot(reading_model2)
 ```
 
-<img src="prediction_reading_score_files/figure-gfm/unnamed-chunk-4-1.png" width="90%" style="display: block; margin: auto;" />
+<img src="prediction_reading_score_files/figure-gfm/Model 2-1.png" width="90%" style="display: block; margin: auto;" />
 
 ``` r
 ### removing the influential point if needed
@@ -918,7 +919,7 @@ par(mfrow = c(2,2))
 plot(reading_model3)
 ```
 
-<img src="prediction_reading_score_files/figure-gfm/unnamed-chunk-6-1.png" width="90%" style="display: block; margin: auto;" />
+<img src="prediction_reading_score_files/figure-gfm/Model 3-1.png" width="90%" style="display: block; margin: auto;" />
 
 ``` r
 ### removing the influential point if needed
@@ -1050,7 +1051,7 @@ plot3 <- ggplot(fold_data_model3, aes(reading_score, col = Fold)) + geom_density
 ggarrange(plot1, plot2, plot3, ncol = 3, common.legend = TRUE)
 ```
 
-<img src="prediction_reading_score_files/figure-gfm/unnamed-chunk-8-1.png" width="95%" style="display: block; margin: auto;" />
+<img src="prediction_reading_score_files/figure-gfm/CV-1.png" width="95%" style="display: block; margin: auto;" />
 
 Below is the 5-fold cross-validation results including fitted value
 versus observed score plot and performace metrices from each of the
@@ -1074,7 +1075,7 @@ filtered_df |>
   scale_x_discrete(labels = c("Predicted Reading Score"))
 ```
 
-<img src="prediction_reading_score_files/figure-gfm/unnamed-chunk-9-1.png" width="95%" style="display: block; margin: auto;" />
+<img src="prediction_reading_score_files/figure-gfm/Pred Reading Score-1.png" width="95%" style="display: block; margin: auto;" />
 
 ``` r
 bind_rows(model1$results, model2$results, model3$results) |> 
@@ -1092,11 +1093,11 @@ bind_rows(model1$results, model2$results, model3$results) |>
 Performance matrices of the 3 Multiple Linear Regression Models
 
 Based on the results, the model with the lowest RMSE value indicates
-highest accuracy. Therefore, the final model will be `reading_model2`
+highest accuracy. Therefore, the final model will be `reading_model2`.
 
 ``` r
 final_model = reading_model2
-summary(reading_model2)
+summary(final_model)
 ```
 
     ## 
