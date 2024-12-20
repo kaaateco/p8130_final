@@ -48,7 +48,9 @@ Our dataset includes data from 948 students. A summary of their demographic and 
 The distributions for Math, Reading, and Writing test scores all had similar distributions ([Fig. 1](#fig1_2_3-section)), were slightly left-skewed. These distributions were also relatively consistent after grouping by the amount of hours students spent studying weekly (<5, 5-10, >10 hours) ([Fig. 2](#fig1_2_3-section)). Within each subject, the median score increased as the amount of time spent studying increased, with the lowest study group having the lowest scores in all subjects. Between the three study groups, there was a statistically significant difference in the distributions (Table 3). Finally, Math, Reading, and Writing scores were all heavily correlated ([Fig. 3](#fig3-section)). 
 All three scores have the same main effect parameters - weekly study hours, test preparation status, lunch type, parents' education and marital status, ethnic group and gender. However, they differ in the presence of some interaction terms. The combined effect of parents' marital status and weekly study hours is significant in predicting math and reading score, while weekly study hours' combined effect with male student and with lunch type is significantly associated with writing score. 
 
+\pagebreak
 
+## {#tab1_2_3-section}
 ```{r setup, include=FALSE, warning = FALSE, message = FALSE, float = TRUE}
 
 library(tidyverse)
@@ -101,7 +103,7 @@ score_df <- read_csv("Project_1_data.csv") |>
          transport_means = fct_relevel(transport_means, "school_bus"), 
          parent_educ = fct_relevel(parent_educ, "some high school"))
 ```
-## {#tab1_2_3-section}
+
 ```{r tab1, echo = FALSE, warning = FALSE, message = FALSE}
 table1 <- score_df %>% 
   select(-c(test_prep, wkly_study_hours, 
