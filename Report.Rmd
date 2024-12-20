@@ -12,7 +12,7 @@ header-includes:
 # Abstract
 This research aims to analyse academic performance data from a public school and verify the effectiveness of regression analysis methods in predicting student outcomes. The study focuses on three critical test scores: Math, Reading, and Writing. After tidying the data, various models were developed to assess the impact of multiple student characteristics and contextual factors on these test scores. The final models are selected using stepwise methods. This analysis aims to: 1. Construct Predictive Models: develop robust models for Math, Reading, and Writing scores using an extensive set of predictors. 2. Identify Key Predictors: Determine which predictors significantly influence each test score and explore potential interaction effects among these predictors. 3. Model Comparisons: evaluate the optimal prediction models for each test score and assess the potential for leveraging one test score to improve the prediction of another.
 
-*results*
+The individual models selected for reading, writing and math score share common main effect variables, with some difference in the interaction modifiers. Our result suggests that failure in test preparation course completion leads to lesser score in all three subjects, while the weekly study hours changes have contradictory effects on different subject. Similarly, social and family aspects like parents' education, marital status, ethnic group and gender were signficantly associated with test scores. 
 
 The resulting linear regression equations provide insights into future trends and identify the most influential variables affecting academic performance. This study contributes valuable information for designing targeted educational interventions and policies to enhance student success. 
 
@@ -41,12 +41,17 @@ The residuals were followed homoscedascticity, mean zero assumptions, but deviat
 We implemented step-wise regression to deduce significant covariates for modeling `reading score`. We note that most of the variables listed are categorical as mentioned prior. Therefore, we incorporated factor reveling in order to give some dimensions. First, we checked for non-linearity in the `reading_score` and apply transformation if need be. As seen above the after Y transformation where $Y^*= ({reading\_score + 1})^{1.44}$, the residuals follow normality, homoscedascity and mean zero looking at the diagnostic plots ([Fig. 14-15, Table 15-17](#fig14_tab15-section)). Next, we produced two additional models by incorporating additional covariates and testing for potential interactions. Three models were selected for cross-validation ([Fig. 16-17, Table 18-19](#fig16_17_tab18_19-section)). 
 
 ## Model Validation
-To evaluate its performance, we conducted 10-fold cross-validation using training datasets, and selected the model based on adjusted $R^2$ and RMSE values as well as the correlation between predicted and observed outcome. Among the two models each that were selected for math score and writing score, models with out sibling counts have lower root mean square error, higher $R^2$ has similar predictive ability as the more complex model ([Table 20-21, Fig. 18-19](#fig1819-section)). Similarly, the model 2 (with one interaction term) had the best performance[Fig. 20](#fig20-section)) in predicting the reading score. 
+To evaluate its performance, we conducted 10-fold cross-validation using training datasets, and selected the model based on adjusted $R^2$ and RMSE values as well as the correlation between predicted and observed outcome. 
 
 # Results
 Our dataset includes data from 948 students. A summary of their demographic and academic data can be found in Tables 1,  2, and 3 in the Appendix. We found that most students were the oldest children in their families, had between one to three siblings, rode the bus to school, and had standard (not free/reduced) lunch. 
 The distributions for Math, Reading, and Writing test scores all had similar distributions ([Fig. 1](#fig1_2_3-section)), were slightly left-skewed. These distributions were also relatively consistent after grouping by the amount of hours students spent studying weekly (<5, 5-10, >10 hours) ([Fig. 2](#fig1_2_3-section)). Within each subject, the median score increased as the amount of time spent studying increased, with the lowest study group having the lowest scores in all subjects. Between the three study groups, there was a statistically significant difference in the distributions (Table 3). Finally, Math, Reading, and Writing scores were all heavily correlated ([Fig. 3](#fig3-section)). 
+
+Among the two models each that were selected for math score and writing score, models with out sibling counts have lower root mean square error, higher $R^2$ has similar predictive ability as the more complex model ([Table 20-21, Fig. 18-19](#fig1819-section)). Similarly, the model 2 (with one interaction term) had the best performance[Fig. 20](#fig20-section)) in predicting the reading score.  
+
 All three scores have the same main effect parameters - weekly study hours, test preparation status, lunch type, parents' education and marital status, ethnic group and gender. However, they differ in the presence of some interaction terms. The combined effect of parents' marital status and weekly study hours is significant in predicting math and reading score, while weekly study hours' combined effect with male student and with lunch type is significantly associated with writing score. 
+
+# Conclusion
 
 \pagebreak
 
@@ -1037,7 +1042,7 @@ plot(2:23, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
 abline(0,1)
 
 plot(2:23, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
-mtext("Figure 13: Test-based Procedures For Math Score", side = 3, line = - 2, outer = TRUE, cex = 1.5)
+mtext("Figure 13: Test-based Procedures For Writing Score", side = 3, line = - 2, outer = TRUE, cex = 1.5)
 
 fit_bestcv |> 
   broom::tidy() |> 
@@ -1072,7 +1077,7 @@ shapiro.test(rstandard(reading_model1)) |>
 
 par(mfrow = c(1,1))
 boxcox_reading <- MASS::boxcox(reading_model1, lambda = seq(-2.5, 2.5, 0.1))
-mtext("Figure 14: Reading Score Model Box-Cox Likelihood", side = 3, line = - 2, outer = TRUE)
+mtext("Figure 14: Box-Cox Likelihood", side = 3, line = - 2, outer = TRUE)
 
 boxcox_reading <- Reduce(cbind, boxcox_reading)
 optimal_power <- boxcox_reading |> 
@@ -1423,6 +1428,6 @@ filtered_df |>
 bind_rows(model1$results, model2$results, model3$results) |> 
   mutate(model_id = c(1, 2, 3)) |> 
   relocate(model_id) |> 
-  knitr::kable(digits =3, caption = "Performance matrices of the 3 Multiple Linear Regression Models")
+  knitr::kable(digits =3, caption = "Performance matrices of the 3 Models in Predicting (Reading Score)^1.4")
 
 ```
