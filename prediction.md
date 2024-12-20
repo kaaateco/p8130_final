@@ -145,6 +145,9 @@ optimal_power <- boxcox |>
   round(digits =2)
 ```
 
+The residuals perfectly don’t fit the Y=X line, and the variance is
+slightly higher in lower predicted math score ($\hat{Y_i}$).
+
 Transforming Y:
 
 ``` r
